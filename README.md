@@ -1,4 +1,3 @@
-cciones" (es descriptivo), o impacto/cifras que no calculaste tú.
 # Tablero de datos abiertos de Colombia con resumen automático
 
 ![CI](https://github.com/JuanSGarciaC/datos-abiertos-colombia-educacion/actions/workflows/ci.yml/badge.svg)
@@ -33,19 +32,6 @@ calcula estadística descriptiva y genera un resumen con control de cifras. Tabl
 - **Contenido:** matrícula de educación superior por municipio y año, con una columna por nivel de formación. Son datos agregados, sin información de personas.
 - **Valor analizado:** suma de los conteos por nivel (técnica profesional, tecnológica, universitaria, especialización, maestría y doctorado). No se suma `ies_con_oferta` porque cuenta instituciones, no estudiantes.
 - **Granularidad:** anual. Cada punto de la serie es un año completo.
-
-### Resultados de mi ejecución
-
-| Dato | Valor |
-|---|---|
-| Fecha de ejecución | [COMPLETAR] |
-| Filas extraídas | [COMPLETAR] |
-| Filas válidas conservadas | [COMPLETAR] |
-| Duplicadas eliminadas | [COMPLETAR] |
-| Período cubierto | [COMPLETAR] |
-| Número de departamentos | [COMPLETAR] |
-
-Estas cifras salen del panel "Calidad de los datos" y de la terminal del pipeline (ver evidencias).
 
 ## Arquitectura
 
