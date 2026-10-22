@@ -1,0 +1,19 @@
+# Parámetros de la muestra sintética (solo para desarrollo).
+# Uso: python -m app.pipeline run --sample --sample-config ../config/sample.yaml
+# También se editan desde el tablero (panel "Editar la muestra").
+seed: 7                       # cambia el número para obtener otra muestra aleatoria
+start: 2023-01-01
+end: 2025-10-14               # un fin a mitad de mes deja el último mes incompleto
+base_level: 40                # escala general de los valores
+growth_pct_per_month: 0.4     # tendencia (% por mes)
+anomaly_month: "2024-06"      # null para no tener mes atípico
+anomaly_factor: 2.6           # multiplica el mes atípico
+add_dirty_rows: true          # agrega filas malas y duplicadas para probar la validación
+categories:                   # pesos relativos (se normalizan)
+  - { name: "Antioquia", weight: 0.28 }
+  - { name: "Bogotá D.C.", weight: 0.30 }
+  - { name: "Valle del Cauca", weight: 0.16 }
+  - { name: "Atlántico", weight: 0.09 }
+  - { name: "Santander", weight: 0.08 }
+  - { name: "Nariño", weight: 0.05 }
+  - { name: "Boyacá", weight: 0.04 }

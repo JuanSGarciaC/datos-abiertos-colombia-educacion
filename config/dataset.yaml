@@ -1,0 +1,24 @@
+# Dataset: "MEN_ESTADISTICAS MATRICULA POR MUNICIPIOS_ES" (Ministerio de Educación), id y9ga-zwzy.
+# Matrícula de educación superior por municipio y año (2005-2021 según la ficha). Datos agregados, sin personas.
+#
+# VERIFICA antes de correr: abre https://www.datos.gov.co/resource/y9ga-zwzy.json?$limit=2
+# y compara las claves con las de abajo. Los nombres salen de una vista hermana del dataset (dqzt-9yfq),
+# NO de este mismo: pueden diferir (por ejemplo "a_o" vs "ano").
+dataset:
+  id: "y9ga-zwzy"
+  domain: "www.datos.gov.co"
+  name: "Matrícula de educación superior por municipio (MEN)"
+  page_size: 5000
+  max_rows: 50000
+  granularity: yearly       # cada fila ya es un año completo
+columns:
+  year: "a_o"                          # <- verifica
+  category: "nombre_del_departamento"  # <- verifica
+  # Se SUMAN solo conteos de estudiantes por nivel. NO incluyas "ies_con_oferta": es número de instituciones, no de estudiantes.
+  value_columns:
+    - "tecnica_profesional"
+    - "tecnologica"
+    - "universitaria"
+    - "especializacion"
+    - "maestria"
+    - "doctorado"
