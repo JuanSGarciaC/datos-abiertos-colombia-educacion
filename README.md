@@ -6,11 +6,11 @@ cciones" (es descriptivo), o impacto/cifras que no calculaste tú.
 Pipeline que descarga un dataset de datos.gov.co (API SODA), lo valida, lo guarda en SQLite,
 calcula estadística descriptiva y genera un resumen con control de cifras. Tablero en React.
 
-![Tablero completo](docs/img/tablero-completo.png)
+![Tablero completo](docs/img/07-tablero-completo.png)
 
 | Barras por año | Calidad de los datos |
 |---|---|
-| ![Barras por año](docs/img/barras-por-anio.png) | ![Calidad de los datos](docs/img/calidad-datos.png) |
+| ![Barras por año](docs/img/10-barras-por-anio.png) | ![Calidad de los datos](docs/img/11-calidad-datos.png) |
 
 ## Qué demuestra este proyecto
 
@@ -162,27 +162,27 @@ Cubren la validación, el análisis, el control de cifras, el pipeline completo 
 
 **Pruebas pasando**
 
-![Pruebas](docs/img/pruebas-verde.png)
+![Pruebas](docs/img/01-pruebas-verde.png)
 
 **Fuente: JSON del dataset en datos.gov.co**
 
-![JSON de la fuente](docs/img/json-fuente.png)
+![JSON de la fuente](docs/img/02-json-fuente.png)
 
 **Configuración del dataset**
 
-![Configuración](docs/img/config-dataset.png)
+![Configuración](docs/img/03-config-dataset.png)
 
 **Pipeline con datos reales**
 
-![Pipeline](docs/img/pipeline-real.png)
+![Pipeline](docs/img/04-pipeline-real.png)
 
 **Documentación de la API**
 
-![API docs](docs/img/api-docs.png)
+![API docs](docs/img/05-api-docs.png)
 
 **Respuesta de `/api/overview`**
 
-![API overview](docs/img/api-overview.png)
+![API overview](docs/img/06-api-overview.png)
 
 </details>
 
