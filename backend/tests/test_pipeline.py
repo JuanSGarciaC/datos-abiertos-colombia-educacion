@@ -59,10 +59,11 @@ def test_pipeline_anual_con_dataset_yaml(tmp_path, monkeypatch):
     from pathlib import Path
     import app.pipeline as pl
     monkeypatch.chdir(tmp_path)
-    rows = [{"a_o": str(y), "nombre_del_departamento": d, "nombre_del_municipio": "m", "tecnica_profesional": str(5 + i),
-             "tecnologica": "3", "universitaria": str(100 * (i + 1) + y - 2005), "especializacion": "2", "maestria": "1",
-             "doctorado": "0", "ies_con_oferta": "9"}
-            for y in range(2005, 2022) for i, d in enumerate(["Antioquia", "Chocó", "Meta"])]
+    rows = [{"a_o": str(y), "nombre_del_departamento": d, "c_digo_delmunicipio": f"{d}001", "nombre_del_municipio": "m",
+             "tecnica_profesional": str(5 + i), "tecnologica": "3", "universitaria": str(100 * (i + 1) + y - 2005),
+             "especializacion": "2", "maestria": "1", "doctorado": "0", "ies_con_oferta": "9"}
+            for y in range(2005, 2022) for i, d in enumerate(["5", "27", "50"])]
+    rows += [{**r, "nombre_del_municipio": "M (otra grafía)"} for r in rows if r["a_o"] < "2021"]  # copias de la fuente
     monkeypatch.setattr(pl, "fetch_all", lambda cfg, token="": rows)
     cfg_path = Path(__file__).resolve().parents[2] / "config" / "dataset.yaml"
     pl.run(str(cfg_path))
@@ -71,6 +72,8 @@ def test_pipeline_anual_con_dataset_yaml(tmp_path, monkeypatch):
     assert ov["meta"]["granularity"] == "yearly" and ov["metrics"]["period"] == "year"
     assert ov["metrics"]["last_month"] == "2021" and ov["metrics"]["partial_last_month"] is False
     assert ov["quality"]["rows_out"] == 51
+    assert ov["quality"]["duplicates_removed"] == 48
+    assert {c["category"] for c in client.get("/api/categories").json()} == {"Antioquia", "Chocó", "Meta"}
     assert any("año" in x["text"] for x in ov["summary"]["sentences"])
     s = client.get("/api/series").json()
     assert s[0]["month"] == "2005" and len(s) == 17
