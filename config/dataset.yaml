@@ -12,8 +12,8 @@ dataset:
   max_rows: 50000
   granularity: yearly       # cada fila ya es un año completo
 columns:
-  year: "a_o"                          # <- verifica
-  category: "nombre_del_departamento"  # <- verifica
+  year: "a_o"
+  category: "nombre_del_departamento"
   # Se SUMAN solo conteos de estudiantes por nivel. NO incluyas "ies_con_oferta": es número de instituciones, no de estudiantes.
   value_columns:
     - "tecnica_profesional"

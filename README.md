@@ -151,7 +151,7 @@ Cubren la validación, el análisis, el control de cifras, el pipeline completo 
 
 ![Pruebas](docs/img/01-pruebas-verde.png)
 
-**Fuente: JSON del dataset en datos.gov.co**
+**Fuente: la API publica el mismo registro dos veces (Bogotá, 2016)**
 
 ![JSON de la fuente](docs/img/02-json-fuente.png)
 
@@ -159,7 +159,7 @@ Cubren la validación, el análisis, el control de cifras, el pipeline completo 
 
 ![Configuración](docs/img/03-config-dataset.png)
 
-**Pipeline con datos reales**
+**Pipeline con datos reales y conciliación con la fuente**
 
 ![Pipeline](docs/img/04-pipeline-real.png)
 
@@ -167,7 +167,7 @@ Cubren la validación, el análisis, el control de cifras, el pipeline completo 
 
 ![API docs](docs/img/05-api-docs.png)
 
-**Respuesta de `/api/overview`**
+**Respuesta de `/api/overview` (después de la corrección)**
 
 ![API overview](docs/img/06-api-overview.png)
 
