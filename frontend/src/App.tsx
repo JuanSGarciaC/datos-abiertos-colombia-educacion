@@ -9,7 +9,7 @@ const n = (x: number) => nf.format(x);
 
 function SeriesChart({ points, anomalies }: { points: SeriesPoint[]; anomalies: string[] }) {
   const [hover, setHover] = useState<number | null>(null);
-  const W = 640, H = 240, L = 46, R = 12, T = 12, B = 28;
+  const W = 640, H = 240, L = 60, R = 12, T = 12, B = 28;
   const max = Math.max(...points.map((p) => p.value), 1);
   const x = (i: number) => L + (points.length > 1 ? (i * (W - L - R)) / (points.length - 1) : 0);
   const y = (v: number) => T + (1 - v / max) * (H - T - B);
@@ -53,7 +53,7 @@ function QualityPanel({ q }: { q: Quality }) {
   const rows: [string, number, string?][] = [
     ["Filas recibidas", q.rows_in],
     ["Filas conservadas", q.rows_out],
-    ["Duplicadas eliminadas", q.duplicates_removed, "Filas idénticas en todas sus columnas"],
+    ["Duplicadas eliminadas", q.duplicates_removed, "Misma clave y mismas cifras (o fila idéntica si no hay clave)"],
     ["Fechas inválidas", q.invalid_dates],
     ["Sin categoría", q.missing_category],
     ["Valores inválidos", q.invalid_values],
@@ -172,7 +172,7 @@ export default function App() {
         </div>
         {series.length > 0 && <SeriesChart points={series} anomalies={category ? [] : m.anomaly_months ?? []} />}
         <p className="note">
-          {yearly ? "Los años atípicos solo se señalan en la serie total. No se sabe si el último año está completo." : "Línea discontinua: mes incompleto, fuera del cambio mensual. Los meses atípicos solo se señalan en la serie total."}
+          {yearly ? "Los años atípicos solo se señalan en la serie total. La fuente no indica si el último año está completo. " : "Línea discontinua: mes incompleto, fuera del cambio mensual. Los meses atípicos solo se señalan en la serie total. "}
           La serie es descriptiva; no pronostica.
         </p>
       </section>

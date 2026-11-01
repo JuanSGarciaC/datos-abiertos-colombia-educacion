@@ -32,13 +32,15 @@ class QualityReport:
 def validate(raw: pd.DataFrame, cols: ColumnsCfg) -> tuple[pd.DataFrame, QualityReport]:
     """Devuelve (datos limpios con columnas date, category, value, is_outlier; reporte)."""
     report = QualityReport(rows_in=len(raw))
-    needed = [c for c in (cols.date, cols.year, cols.month, cols.category, cols.value, *(cols.value_columns or [])) if c]
+    needed = [c for c in (cols.date, cols.year, cols.month, cols.category, cols.value, *(cols.value_columns or []), *(cols.key or [])) if c]
     missing = [c for c in needed if c not in raw.columns]
     if missing:
         raise ValueError(f"Columnas no encontradas: {missing}. Disponibles: {list(raw.columns)}")
 
-    # 1) Duplicados: filas completas idénticas
-    df = raw.drop_duplicates()
+    # 1) Duplicados: filas completas idénticas o, si hay clave, misma clave y mismas cifras
+    #    (la fuente puede repetir un registro cambiando solo un texto, como el nombre del municipio)
+    subset = [*cols.key, *(cols.value_columns or []), *([cols.value] if cols.value else [])] if cols.key else None
+    df = raw.drop_duplicates(subset=subset)
     report.duplicates_removed = len(raw) - len(df)
 
     out = pd.DataFrame(index=df.index)
@@ -49,6 +51,8 @@ def validate(raw: pd.DataFrame, cols: ColumnsCfg) -> tuple[pd.DataFrame, Quality
         m = pd.to_numeric(df[cols.month], errors="coerce") if cols.month else pd.Series(1, index=df.index)
         out["date"] = pd.to_datetime({"year": y, "month": m, "day": 1}, errors="coerce")
     out["category"] = df[cols.category].astype("string").str.strip()
+    if cols.category_labels:
+        out["category"] = out["category"].replace(cols.category_labels)
     if cols.value_columns:
         nums = df[cols.value_columns].apply(pd.to_numeric, errors="coerce")
         out["value"] = nums.sum(axis=1, min_count=1)  # suma de las columnas disponibles
@@ -66,7 +70,7 @@ def validate(raw: pd.DataFrame, cols: ColumnsCfg) -> tuple[pd.DataFrame, Quality
     report.invalid_dates = int(bad_date.sum())
     out = out[~bad_date]
 
-    bad_cat = out["category"].isna() | (out["category"] == "")
+    bad_cat = out["category"].isna() | out["category"].isin(["", "-"])  # "-" = sin dato en la fuente
     report.missing_category = int(bad_cat.sum())
     out = out[~bad_cat]
 

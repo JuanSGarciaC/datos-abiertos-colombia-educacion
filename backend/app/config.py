@@ -36,6 +36,8 @@ class ColumnsCfg(BaseModel):
     category: str
     value: str | None = None                 # una columna numérica...
     value_columns: list[str] | None = None   # ...o varias que se SUMAN (solo conteos aditivos, nunca tasas)
+    key: list[str] | None = None             # identifica un registro: misma clave y mismas cifras = copia
+    category_labels: dict[str, str] | None = None  # código de la fuente -> nombre legible (también unifica "5" y "05")
 
     @model_validator(mode="after")
     def _need_date(self) -> "ColumnsCfg":
