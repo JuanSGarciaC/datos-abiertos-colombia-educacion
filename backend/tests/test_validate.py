@@ -62,3 +62,27 @@ def test_valor_como_suma_de_columnas_y_solo_anio():
 def test_value_y_value_columns_son_excluyentes():
     with pytest.raises(ValueError):
         ColumnsCfg(year="a", category="d", value="v", value_columns=["x"])
+
+
+def test_clave_detecta_copias_con_nombre_distinto():
+    # La fuente publica cada registro dos veces y a veces cambia la grafía del municipio.
+    raw = pd.DataFrame({"a_o": ["2016", "2016", "2016"], "mun": ["11001", "11001", "05001"],
+                        "nombre": ["BOGOTÁ D.C.", "SANTAFE DE BOGOTA", "MEDELLÍN"],
+                        "dep": ["11", "11", "05"], "tec": ["10", "10", "7"]})
+    cols = ColumnsCfg(year="a_o", category="dep", value_columns=["tec"], key=["a_o", "mun"])
+    clean, rep = validate(raw, cols)
+    assert rep.duplicates_removed == 1 and clean["value"].sum() == 17
+
+
+def test_clave_conserva_registros_distintos_del_mismo_municipio():
+    raw = pd.DataFrame({"a_o": ["2005"] * 2, "mun": ["20001"] * 2, "dep": ["20"] * 2, "tec": ["329", "0"], "uni": ["0", "11391"]})
+    cols = ColumnsCfg(year="a_o", category="dep", value_columns=["tec", "uni"], key=["a_o", "mun"])
+    clean, rep = validate(raw, cols)
+    assert rep.duplicates_removed == 0 and clean["value"].sum() == 11720
+
+
+def test_etiquetas_unifican_codigos_y_guion_es_sin_categoria():
+    raw = _raw([("2024-01-01", "5", 1), ("2024-01-02", "05", 2), ("2024-01-03", "-", 3)])
+    clean, rep = validate(raw, ColumnsCfg(date="fecha", category="dep", value="valor",
+                                          category_labels={"5": "Antioquia", "05": "Antioquia"}))
+    assert clean["category"].tolist() == ["Antioquia", "Antioquia"] and rep.missing_category == 1

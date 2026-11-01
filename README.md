@@ -16,7 +16,7 @@ calcula estadística descriptiva y genera un resumen con control de cifras. Tabl
 | Habilidad | Dónde se ve |
 |---|---|
 | Consumo de APIs con paginación y reintentos | `backend/app/extract.py` |
-| Calidad de datos y trazabilidad | `backend/app/validate.py` y panel "Calidad de los datos" |
+| Calidad de datos y trazabilidad | `backend/app/validate.py`, panel "Calidad de los datos" y [conciliación con la fuente](docs/RECONCILIACION.md) (`backend/app/reconcile.py`) |
 | SQL y modelado básico | tabla `records` en SQLite, `backend/app/db.py` |
 | Análisis descriptivo | `backend/app/analyze.py` |
 | IA aplicada con control de errores | `backend/app/summarize.py` |
@@ -32,6 +32,7 @@ calcula estadística descriptiva y genera un resumen con control de cifras. Tabl
 - **Contenido:** matrícula de educación superior por municipio y año, con una columna por nivel de formación. Son datos agregados, sin información de personas.
 - **Valor analizado:** suma de los conteos por nivel (técnica profesional, tecnológica, universitaria, especialización, maestría y doctorado). No se suma `ies_con_oferta` porque cuenta instituciones, no estudiantes.
 - **Granularidad:** anual. Cada punto de la serie es un año completo.
+- **Columnas, tipos y reglas de agregación:** [docs/DICCIONARIO_DATOS.md](docs/DICCIONARIO_DATOS.md).
 
 ## Arquitectura
 
@@ -65,7 +66,7 @@ El control compara números; **no** verifica que la interpretación sea correcta
 
 | Decisión | Razón | Límite honesto |
 |---|---|---|
-| Duplicados: se comparan filas completas | Sin identificador único, dos eventos distintos pueden coincidir | Una fila realmente repetida en la fuente también se elimina; queda contada en el reporte |
+| Duplicados: misma clave (`key` en `dataset.yaml`) y mismas cifras; sin clave, filas completas | La fuente repite registros cambiando solo un texto (nombre del municipio, código `5`/`05`) | Dos registros distintos con la misma clave y exactamente las mismas cifras se tomarían como copia; queda contado en el reporte |
 | Valores atípicos: se marcan, no se eliminan | Un valor extremo puede ser real | Quien analiza decide qué hacer con ellos |
 | Cada descarte se cuenta por separado | Trazabilidad de la limpieza | Solo cuenta lo que el código detecta |
 | Solo se suman conteos aditivos | Sumar tasas o promedios no tiene sentido | Hay que elegir las columnas en `dataset.yaml` |
@@ -78,8 +79,8 @@ El control compara números; **no** verifica que la interpretación sea correcta
 
 - La serie anual tiene pocos puntos, así que la pendiente y los años atípicos son orientativos.
 - El total es la suma de matriculados por nivel de formación; no es un conteo de personas únicas.
-- No se sabe si el último año de la fuente está completo.
-- **Pendiente:** contrastar el total de un año con un cálculo independiente (por ejemplo, desde el CSV original del portal).
+- **Conciliación hecha (2026-11-01):** los totales por año cuadran con la suma que calcula el servidor de datos.gov.co, y las variaciones 2020→2021 (+3,93 %) y 2019→2020 (-1,7 %) coinciden con las cifras oficiales publicadas. 2021 se trata como año completo. Detalle en [docs/RECONCILIACION.md](docs/RECONCILIACION.md).
+- La fuente publica casi todos los registros de 2005-2020 **dos veces**. El pipeline los detecta por clave (año + municipio + cifras); antes solo quitaba filas idénticas y el tablero mostraba una caída falsa del 48 % en 2021.
 - La integración con un modelo de lenguaje real está implementada, pero **no ha sido probada** con un modelo real; por defecto el resumen se redacta con reglas fijas (`LLM_PROVIDER=mock`).
 - Es un análisis descriptivo: no predice ni afirma impacto.
 
