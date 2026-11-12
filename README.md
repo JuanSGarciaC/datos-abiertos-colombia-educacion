@@ -119,6 +119,9 @@ El control compara números; **no** verifica que la interpretación sea correcta
 - **Conciliación hecha (2026-11-01):** los totales por año cuadran con la suma que calcula el servidor de datos.gov.co, y las variaciones 2020→2021 (+3,93 %) y 2019→2020 (-1,7 %) coinciden con las cifras oficiales publicadas. 2021 se trata como año completo. Detalle en [docs/RECONCILIACION.md](docs/RECONCILIACION.md).
 - La fuente publica casi todos los registros de 2005-2020 **dos veces**. El pipeline los detecta por clave (año + municipio + cifras); antes solo quitaba filas idénticas y el tablero mostraba una caída falsa del 48 % en 2021.
 - La integración con un modelo de lenguaje real está implementada, pero **no ha sido probada** con un modelo real; por defecto el resumen se redacta con reglas fijas (`LLM_PROVIDER=mock`).
+- La ejecución desde el tablero depende de que datos.gov.co responda. Si falla, se muestra el error y se conserva la ejecución anterior; un contenedor recién creado se queda vacío hasta que la fuente vuelva.
+- Las barras y la tabla de conciliación solo se comprueban en un navegador con `scripts/tablero.py --real`, a mano; el CI usa la muestra sintética, que no tiene fuente con la que conciliar.
+- El tablero carga las tipografías desde Google Fonts (una petición a terceros).
 - Es un análisis descriptivo: no predice ni afirma impacto.
 
 ## Ejecutar con Docker
@@ -210,9 +213,13 @@ conciliación (la muestra sintética no tiene fuente con la que conciliar).
 <details>
 <summary>Ver capturas</summary>
 
-**Pruebas pasando**
+**Pruebas pasando** (salida del 2026-11-12; el CI las corre en cada push, ver la insignia de arriba)
 
-![Pruebas](docs/img/01-pruebas-verde.png)
+```text
+> pytest -q
+.......................................                                  [100%]
+39 passed, 1 warning
+```
 
 **Fuente: la API publica el mismo registro dos veces (Bogotá, 2016)**
 
@@ -244,7 +251,9 @@ backend/tests/      pruebas automáticas
 config/             dataset.yaml y sample.yaml
 frontend/src/       tablero React (App, Flow, Visuals, SamplePanel)
 scripts/            tablero.py: comprobaciones en navegador, capturas y GIF
-docs/img/           capturas
+docs/img/           capturas y GIF
+docs/superpowers/   especificación de la última fase
+Dockerfile, docker-compose.yml   un contenedor: la API sirve el tablero compilado
 .github/workflows/  ci.yml
 ```
 
