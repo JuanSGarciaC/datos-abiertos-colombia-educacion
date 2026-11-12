@@ -64,7 +64,8 @@ def test_pipeline_anual_con_dataset_yaml(tmp_path, monkeypatch):
              "especializacion": "2", "maestria": "1", "doctorado": "0", "ies_con_oferta": "9"}
             for y in range(2005, 2022) for i, d in enumerate(["5", "27", "50"])]
     rows += [{**r, "nombre_del_municipio": "M (otra grafía)"} for r in rows if r["a_o"] < "2021"]  # copias de la fuente
-    monkeypatch.setattr(pl, "fetch_all", lambda cfg, token="": rows)
+    monkeypatch.setattr(pl, "fetch_all", lambda cfg, token="", on_page=None: rows)
+    monkeypatch.setattr(pl, "reconcile", lambda clean, cfg, token="": [])
     cfg_path = Path(__file__).resolve().parents[2] / "config" / "dataset.yaml"
     pl.run(str(cfg_path))
     client = TestClient(app)

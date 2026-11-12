@@ -101,11 +101,12 @@ export function YearOverYear({ series }: { series: SeriesPoint[] }) {
   );
 }
 
-export function AnnualBars({ series, anomalies }: { series: SeriesPoint[]; anomalies: string[] }) {
+export function AnnualBars({ series, anomalies, source = {} }: { series: SeriesPoint[]; anomalies: string[]; source?: Record<string, number> }) {
   const [sel, setSel] = useState<SeriesPoint | null>(null);
-  const W = 640, H = 220, L = 52, R = 8, T = 10, B = 26;
-  const max = Math.max(...series.map((p) => p.value), 1);
+  const W = 640, H = 220, L = 76, R = 8, T = 10, B = 26;
+  const max = Math.max(...series.map((p) => Math.max(p.value, source[p.month] ?? 0)), 1);
   const slot = (W - L - R) / Math.max(series.length, 1);
+  const hasSource = Object.keys(source).length > 0;
   const step = Math.max(1, Math.round(series.length / 8));
   return (
     <div>
@@ -116,11 +117,13 @@ export function AnnualBars({ series, anomalies }: { series: SeriesPoint[]; anoma
         ))}
         {series.map((p, i) => {
           const h = (p.value / max) * (H - T - B);
+          const hs = ((source[p.month] ?? 0) / max) * (H - T - B);
           return (
             <g key={p.month}>
+              {hs > 0 && <rect className="ghost" x={L + i * slot + slot * 0.12} y={H - B - hs} width={slot * 0.76} height={hs} rx={2} />}
               <rect x={L + i * slot + slot * 0.12} y={H - B - h} width={slot * 0.76} height={Math.max(h, 0)} rx={2}
                 fill={anomalies.includes(p.month) ? "var(--warn)" : "var(--accent)"} opacity={sel?.month === p.month ? 1 : 0.8}
-                tabIndex={0} role="img" aria-label={`${p.month}: ${n(p.value)}`}
+                tabIndex={0} role="img" aria-label={`${p.month}: ${n(p.value)}${source[p.month] ? `; publicado ${n(source[p.month])}` : ""}`}
                 onPointerEnter={() => setSel(p)} onFocus={() => setSel(p)} onClick={() => setSel(p)} />
               {i % step === 0 && <text className="tick" x={L + i * slot + slot / 2} y={H - 8} textAnchor="middle">{p.month}</text>}
             </g>
@@ -128,7 +131,9 @@ export function AnnualBars({ series, anomalies }: { series: SeriesPoint[]; anoma
         })}
       </svg>
       <p className="note" aria-live="polite">
-        {sel ? <><strong>{sel.month}</strong>: {n(sel.value)}{anomalies.includes(sel.month) && " (año atípico)"}</> : "Toca una barra para ver la cifra. Ámbar = año atípico."}
+        {sel ? <><strong>{sel.month}</strong>: {n(sel.value)}{anomalies.includes(sel.month) && " (año atípico)"}
+          {source[sel.month] ? ` · la fuente publica ${n(source[sel.month])} (${(source[sel.month] / sel.value).toLocaleString("es-CO", { maximumFractionDigits: 4 })} veces)` : ""}</>
+          : `Toca una barra para ver la cifra. Ámbar = año atípico.${hasSource ? " Contorno punteado = suma que publica la fuente, sin limpiar." : ""}`}
       </p>
     </div>
   );

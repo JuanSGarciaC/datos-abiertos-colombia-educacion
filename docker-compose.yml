@@ -1,0 +1,12 @@
+# Tablero y API en http://localhost:8090 (otro puerto: DATOS_PORT=9000 docker compose up).
+# Arranca sin datos: el botón "Ejecutar pipeline" los descarga de datos.gov.co.
+services:
+  app:
+    build: .
+    ports: ["${DATOS_PORT:-8090}:8000"]
+    env_file:
+      - path: backend/.env
+        required: false
+    volumes: ["datos:/data"]
+volumes:
+  datos:

@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getCategories, getOverview, getSeries } from "./api";
+import { getCategories, getOverview, getRun, getSeries, postRun } from "./api";
+import Flow from "./Flow";
 import SamplePanel from "./SamplePanel";
 import { AnnualBars, Heatmap, Kpis, YearOverYear } from "./Visuals";
-import type { Category, Overview, Quality, SeriesPoint } from "./types";
+import type { Category, Overview, Quality, Reconcile, RunStatus, SeriesPoint } from "./types";
 
 const nf = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
 const n = (x: number) => nf.format(x);
 
 function SeriesChart({ points, anomalies }: { points: SeriesPoint[]; anomalies: string[] }) {
   const [hover, setHover] = useState<number | null>(null);
-  const W = 640, H = 240, L = 60, R = 12, T = 12, B = 28;
+  const W = 640, H = 240, L = 76, R = 12, T = 12, B = 28;
   const max = Math.max(...points.map((p) => p.value), 1);
   const x = (i: number) => L + (points.length > 1 ? (i * (W - L - R)) / (points.length - 1) : 0);
   const y = (v: number) => T + (1 - v / max) * (H - T - B);
@@ -75,26 +76,74 @@ function QualityPanel({ q }: { q: Quality }) {
   );
 }
 
+function ReconcileNote({ rec }: { rec: Reconcile }) {
+  if (rec.error) return <p className="note">Sin conciliar: la fuente no respondió a la consulta de totales ({rec.error}).</p>;
+  const differ = rec.rows.filter((r) => r.diff !== 0).length;
+  return (
+    <>
+      <p className="note">
+        En {differ} de {rec.rows.length} años la suma que publica la fuente no coincide con la del pipeline: la diferencia es lo que quitó la limpieza.
+        Esa suma la calcula el servidor de datos.gov.co, no este código.
+      </p>
+      <details>
+        <summary>Ver la conciliación año por año</summary>
+        <div className="table-scroll">
+          <table>
+            <thead><tr><th scope="col">Año</th><th scope="col">Pipeline</th><th scope="col">Publicado</th><th scope="col">Filas publicadas</th><th scope="col">Publicado / pipeline</th></tr></thead>
+            <tbody>
+              {rec.rows.map((r) => (
+                <tr key={r.period}>
+                  <th scope="row">{r.period}</th><td>{n(r.pipeline)}</td><td>{n(r.source)}</td><td>{n(r.source_rows)}</td>
+                  <td>{r.ratio == null ? "n/d" : r.ratio.toLocaleString("es-CO", { maximumFractionDigits: 4 })}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </>
+  );
+}
+
 export default function App() {
   const [ov, setOv] = useState<Overview | null>(null);
+  const [ready, setReady] = useState(false);
   const [cats, setCats] = useState<Category[]>([]);
   const [category, setCategory] = useState("");
   const [series, setSeries] = useState<SeriesPoint[]>([]);
   const [full, setFull] = useState<SeriesPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [run, setRun] = useState<RunStatus | null>(null);
+  const [runErr, setRunErr] = useState<string | null>(null);
+  const [fresh, setFresh] = useState(false); // hubo una ejecución en esta visita: el mapa la repasa nodo a nodo
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setError(null);
-    Promise.all([getOverview(), getCategories(), getSeries()])
-      .then(([o, c, f]) => { setOv(o); setCats(c); setFull(f); setCategory(""); })
-      .catch((e: Error) => setError(e.message));
+    try {
+      const o = await getOverview();
+      if (o) {
+        const [c, f] = await Promise.all([getCategories(), getSeries()]);
+        setCats(c); setFull(f); setCategory("");
+      }
+      setOv(o); setReady(true);
+    } catch (e) { setError((e as Error).message); }
   }, []);
-  useEffect(load, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     if (!ov) return;
     getSeries(category || undefined).then(setSeries).catch((e: Error) => setError(e.message));
   }, [ov, category]);
+
+  const execute = async () => {
+    setRunErr(null);
+    setRun({ running: true, stage: "extraer", rows: 0 });
+    let alive = true; // una respuesta de progreso que llegue tarde no debe revivir el estado "en curso"
+    const timer = setInterval(() => { getRun().then((s) => { if (alive && s.running) setRun(s); }).catch(() => {}); }, 500);
+    try { await postRun(); setFresh(true); await load(); }
+    catch (e) { setRunErr((e as Error).message); }
+    finally { alive = false; clearInterval(timer); setRun(null); }
+  };
 
   const maxCat = useMemo(() => Math.max(...cats.map((c) => c.value), 1), [cats]);
 
@@ -103,121 +152,150 @@ export default function App() {
       <main className="page">
         <h1>No se pudieron cargar los datos</h1>
         <p>{error}</p>
-        <p>Ejecuta el pipeline y confirma que el servidor está en <code>localhost:8000</code>.</p>
+        <p>Confirma que el servidor está en marcha (<code>uvicorn app.api:app</code> o <code>docker compose up</code>).</p>
       </main>
     );
   }
-  if (!ov) return <main className="page"><p>Cargando…</p></main>;
+  if (!ready) return <main className="page"><p>Cargando…</p></main>;
 
-  const demo = ov.meta.source === "demo-sintetica";
-  const yearly = ov.meta.granularity === "yearly";
-  const m = ov.metrics;
+  const demo = ov?.meta.source === "demo-sintetica";
+  const yearly = ov?.meta.granularity === "yearly";
+  const m = ov?.metrics;
+  const rec = ov?.reconcile;
+  const anomalies = category ? [] : m?.anomaly_months ?? [];
+  const source = !category && rec ? Object.fromEntries(rec.rows.map((r) => [r.period, r.source])) : {};
+  const hasRec = !!rec && (rec.rows.length > 0 || !!rec.error);
   return (
     <main className="page">
+      <header className="top">
+        <div>
+          <p className="eyebrow">Datos abiertos de Colombia</p>
+          <h1>{ov?.meta.dataset_name ?? "Tablero de datos abiertos"}</h1>
+          {ov && m && (
+            <p className="sub">
+              {m.date_min} a {m.date_max} · {n(m.rows)} registros ·{" "}
+              {demo ? "fuente: sintética" : <a href={ov.meta.source}>fuente: datos.gov.co</a>}
+            </p>
+          )}
+        </div>
+        <div className="run">
+          <button className="primary" onClick={() => void execute()} disabled={!!run}>{run ? "Ejecutando…" : "Ejecutar pipeline"}</button>
+          <small>Descarga los datos reales de datos.gov.co</small>
+        </div>
+      </header>
+      {runErr && <p className="error" role="alert">{runErr}</p>}
       {demo && (
         <p className="banner" role="note">
           Estos son datos sintéticos de demostración. No describen la realidad: no los uses como evidencia ni en capturas de portafolio.
         </p>
       )}
-      <header>
-        <h1>{ov.meta.dataset_name}</h1>
-        <p className="sub">
-          {m.date_min} a {m.date_max} · {n(m.rows)} registros ·{" "}
-          {demo ? "fuente: sintética" : <a href={ov.meta.source}>fuente: datos.gov.co</a>}
-        </p>
-      </header>
 
-      <Kpis m={m} series={full} yearly={yearly} />
+      <Flow ov={ov} run={run} fresh={fresh} />
 
-      {demo && (
-        <section aria-labelledby="h-muestra">
-          <h2 id="h-muestra">Muestra sintética</h2>
-          <p className="note">Cambia los parámetros y regenera: todo el tablero, el resumen y las pruebas de validación se recalculan.</p>
-          <SamplePanel onDone={load} />
-        </section>
-      )}
-
-      <section aria-labelledby="h-res">
-        <h2 id="h-res">Resumen</h2>
-        <ol className="summary">
-          {ov.summary.sentences.map((s) => (
-            <li key={s.fact_id}>
-              <p>{s.text}</p>
-              <details>
-                <summary>Ver cifras que lo respaldan</summary>
-                <dl className="evidence">
-                  {Object.entries(s.evidence).map(([k, v]) => (<div key={k}><dt>{k}</dt><dd>{v}</dd></div>))}
-                </dl>
-                {s.fallback && <p className="note">El modelo cambió una cifra; se mostró el texto original.</p>}
-              </details>
-            </li>
-          ))}
-        </ol>
-        <p className="note">
-          {ov.summary.provider === "mock" ? "Redactado con reglas fijas, sin modelo de lenguaje." : `Redactado con ${ov.summary.model}.`}{" "}
-          El control compara números; no verifica que la interpretación sea correcta.
-        </p>
-      </section>
-
-      <section aria-labelledby="h-serie">
-        <div className="row">
-          <h2 id="h-serie">{yearly ? "Valor por año" : "Valor por mes"}</h2>
-          <label>
-            Categoría{" "}
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">Todas</option>
-              {cats.map((c) => <option key={c.category}>{c.category}</option>)}
-            </select>
-          </label>
-        </div>
-        {series.length > 0 && <SeriesChart points={series} anomalies={category ? [] : m.anomaly_months ?? []} />}
-        <p className="note">
-          {yearly ? "Los años atípicos solo se señalan en la serie total. La fuente no indica si el último año está completo. " : "Línea discontinua: mes incompleto, fuera del cambio mensual. Los meses atípicos solo se señalan en la serie total. "}
-          La serie es descriptiva; no pronostica.
-        </p>
-      </section>
-
-      {yearly ? (
-        <section aria-labelledby="h-bars">
-          <h2 id="h-bars">Barras por año</h2>
-          {series.length > 0 && <AnnualBars series={series} anomalies={category ? [] : m.anomaly_months ?? []} />}
-        </section>
-      ) : (
+      {ov && m && (
         <>
-          <section aria-labelledby="h-heat">
-            <h2 id="h-heat">Mapa de calor: mes por año</h2>
-            {series.length > 0 && <Heatmap series={series} />}
+          <Kpis m={m} series={full} yearly={!!yearly} />
+
+          {demo && (
+            <section className="card" aria-labelledby="h-muestra">
+              <h2 id="h-muestra">Muestra sintética</h2>
+              <p className="note">Cambia los parámetros y regenera: todo el tablero, el resumen y las pruebas de validación se recalculan.</p>
+              <SamplePanel onDone={() => { setFresh(true); void load(); }} />
+            </section>
+          )}
+
+          <section className="card" aria-labelledby="h-res">
+            <h2 id="h-res">Resumen</h2>
+            <ol className="summary">
+              {ov.summary.sentences.map((s) => (
+                <li key={s.fact_id}>
+                  <p>{s.text}</p>
+                  <details>
+                    <summary>Ver cifras que lo respaldan</summary>
+                    <dl className="evidence">
+                      {Object.entries(s.evidence).map(([k, v]) => (<div key={k}><dt>{k}</dt><dd>{v}</dd></div>))}
+                    </dl>
+                    {s.fallback && <p className="note">El modelo cambió una cifra; se mostró el texto original.</p>}
+                  </details>
+                </li>
+              ))}
+            </ol>
+            <p className="note">
+              {ov.summary.provider === "mock" ? "Redactado con reglas fijas, sin modelo de lenguaje." : `Redactado con ${ov.summary.model}.`}{" "}
+              El control compara números; no verifica que la interpretación sea correcta.
+            </p>
           </section>
-          <section aria-labelledby="h-yoy">
-            <h2 id="h-yoy">Año contra año</h2>
-            {series.length > 0 && <YearOverYear series={series} />}
-            <p className="note">Cada línea es un año; la más gruesa es el más reciente. El punto ámbar es un mes incompleto.</p>
+
+          <div className="grid2">
+            <section className="card" aria-labelledby="h-serie">
+              <div className="row">
+                <h2 id="h-serie">{yearly ? "Valor por año" : "Valor por mes"}</h2>
+                <label>
+                  Categoría{" "}
+                  <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                    <option value="">Todas</option>
+                    {cats.map((c) => <option key={c.category}>{c.category}</option>)}
+                  </select>
+                </label>
+              </div>
+              {series.length > 0 && <SeriesChart points={series} anomalies={anomalies} />}
+              <p className="note">
+                {yearly ? "Los años atípicos solo se señalan en la serie total. La fuente no indica si el último año está completo. " : "Línea discontinua: mes incompleto, fuera del cambio mensual. Los meses atípicos solo se señalan en la serie total. "}
+                La serie es descriptiva; no pronostica.
+              </p>
+            </section>
+
+            <section className="card" aria-labelledby="h-cat">
+              <h2 id="h-cat">Valor por categoría</h2>
+              <ul className="bars">
+                {cats.slice(0, 10).map((c) => (
+                  <li key={c.category}>
+                    <button className={c.category === category ? "on" : ""} onClick={() => setCategory(c.category === category ? "" : c.category)}>
+                      <span className="name">{c.category}</span>
+                      <span className="bar"><i style={{ width: `${(c.value / maxCat) * 100}%` }} /></span>
+                      <span className="val">{n(c.value)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="note">Toca una categoría para filtrar la serie.</p>
+            </section>
+          </div>
+
+          {yearly ? (
+            <section className="card" aria-labelledby="h-bars">
+              <h2 id="h-bars">{hasRec ? "Pipeline frente a lo que publica la fuente" : "Barras por año"}</h2>
+              {series.length > 0 && <AnnualBars series={series} anomalies={anomalies} source={source} />}
+              {hasRec && <ReconcileNote rec={rec!} />}
+            </section>
+          ) : (
+            <>
+              <div className="grid2">
+                <section className="card" aria-labelledby="h-heat">
+                  <h2 id="h-heat">Mapa de calor: mes por año</h2>
+                  {series.length > 0 && <Heatmap series={series} />}
+                </section>
+                <section className="card" aria-labelledby="h-yoy">
+                  <h2 id="h-yoy">Año contra año</h2>
+                  {series.length > 0 && <YearOverYear series={series} />}
+                  <p className="note">Cada línea es un año; la más gruesa es el más reciente. El punto ámbar es un mes incompleto.</p>
+                </section>
+              </div>
+              {hasRec && (
+                <section className="card" aria-labelledby="h-conc">
+                  <h2 id="h-conc">Conciliación con la fuente</h2>
+                  <ReconcileNote rec={rec!} />
+                </section>
+              )}
+            </>
+          )}
+
+          <section className="card" aria-labelledby="h-cal">
+            <h2 id="h-cal">Calidad de los datos</h2>
+            <QualityPanel q={ov.quality} />
           </section>
         </>
       )}
-
-      <section aria-labelledby="h-cat">
-        <h2 id="h-cat">Valor por categoría</h2>
-        <ul className="bars">
-          {cats.slice(0, 10).map((c) => (
-            <li key={c.category}>
-              <button className={c.category === category ? "on" : ""} onClick={() => setCategory(c.category === category ? "" : c.category)}>
-                <span className="name">{c.category}</span>
-                <span className="bar"><i style={{ width: `${(c.value / maxCat) * 100}%` }} /></span>
-                <span className="val">{n(c.value)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        <p className="note">Toca una categoría para filtrar la serie.</p>
-      </section>
-
-      <section aria-labelledby="h-cal">
-        <h2 id="h-cal">Calidad de los datos</h2>
-        <QualityPanel q={ov.quality} />
-      </section>
-
-      <footer className="note">Última ejecución: {new Date(ov.meta.run_at).toLocaleString("es-CO")}</footer>
     </main>
   );
 }

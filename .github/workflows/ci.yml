@@ -19,3 +19,19 @@ jobs:
         with: { node-version: "22" }
       - run: npm install
       - run: npm run build
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install playwright
+      - run: docker compose up -d --build --wait
+      - name: Tablero vacío
+        run: python scripts/tablero.py --channel chrome
+      - name: Tablero con la muestra sintética
+        run: |
+          docker compose exec -T app python -m app.pipeline run --sample
+          python scripts/tablero.py --channel chrome
+      - if: failure()
+        run: docker compose logs

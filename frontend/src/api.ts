@@ -1,4 +1,4 @@
-import type { Category, Overview, SampleParams, SeriesPoint } from "./types";
+import type { Category, Overview, RunStatus, SampleParams, SeriesPoint } from "./types";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -12,7 +12,21 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const getOverview = () => get<Overview>("/api/overview");
+/** null = la API responde pero todavía no se ha ejecutado el pipeline (503). */
+export async function getOverview(): Promise<Overview | null> {
+  const res = await fetch(`${BASE}/api/overview`);
+  if (res.status === 503) return null;
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  return res.json();
+}
+export const getRun = () => get<RunStatus>("/api/run");
+export async function postRun(): Promise<void> {
+  const res = await fetch(`${BASE}/api/run`, { method: "POST" });
+  if (res.ok) return;
+  let msg = `Error ${res.status}`;
+  try { msg = (await res.json()).detail ?? msg; } catch { /* sin JSON */ }
+  throw new Error(msg);
+}
 export const getCategories = () => get<Category[]>("/api/categories");
 export const getSeries = (category?: string) =>
   get<SeriesPoint[]>(`/api/series${category ? `?category=${encodeURIComponent(category)}` : ""}`);

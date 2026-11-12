@@ -22,7 +22,7 @@ def _get_with_retry(client: httpx.Client, url: str, params: dict, headers: dict,
     return []
 
 
-def fetch_all(cfg: PipelineCfg, token: str = "", client: httpx.Client | None = None) -> list[dict]:
+def fetch_all(cfg: PipelineCfg, token: str = "", client: httpx.Client | None = None, on_page=None) -> list[dict]:
     url = f"https://{cfg.dataset.domain}/resource/{cfg.dataset.id}.json"
     headers = {"X-App-Token": token} if token else {}
     own = client is None
@@ -36,6 +36,8 @@ def fetch_all(cfg: PipelineCfg, token: str = "", client: httpx.Client | None = N
             if not page:
                 break
             rows.extend(page)
+            if on_page:
+                on_page(len(rows))  # progreso para GET /api/run
             offset += len(page)
             if len(page) < cfg.dataset.page_size:
                 break
@@ -50,4 +52,6 @@ def save_raw(rows: list[dict], directory: str | Path = "data/raw") -> Path:
     path.mkdir(parents=True, exist_ok=True)
     out = path / f"raw_{datetime.now():%Y%m%d_%H%M%S}.json"
     out.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+    for stale in sorted(path.glob("raw_*.json"))[:-3]:  # se guardan las tres últimas: el botón del tablero no debe llenar el disco
+        stale.unlink()
     return out
