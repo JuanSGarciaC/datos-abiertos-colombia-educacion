@@ -98,3 +98,22 @@ def test_save_raw_conserva_solo_las_tres_ultimas(tmp_path):
     new = save_raw([{"a": 1}], tmp_path)
     assert len(list(tmp_path.glob("raw_*.json"))) == 3 and new.exists()
     assert not (tmp_path / "raw_20200101_000000.json").exists()
+
+
+def test_un_fallo_tardio_no_deja_la_base_a_medias(tmp_path, monkeypatch):
+    """Si algo falla después de validar (aquí, el resumen), siguen intactas las filas y las métricas anteriores."""
+    client = _client(tmp_path, monkeypatch)
+    pl.run("", use_sample=True)
+    before = client.get("/api/categories").json()
+    monkeypatch.setattr(pl, "summarize", lambda facts: 1 / 0)
+    res = client.post("/api/run")
+    assert res.status_code == 500 and "se conserva" in res.json()["detail"]
+    assert client.get("/api/categories").json() == before
+    assert client.get("/api/overview").json()["meta"]["source"] == "demo-sintetica"
+
+
+def test_csv_bloqueado_no_tumba_la_ejecucion(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    monkeypatch.setattr(pd.DataFrame, "to_csv", lambda *a, **k: (_ for _ in ()).throw(PermissionError("abierto en Excel")))
+    assert client.post("/api/run").status_code == 200
+    assert client.get("/api/overview").json()["meta"]["source"].startswith("https://www.datos.gov.co")

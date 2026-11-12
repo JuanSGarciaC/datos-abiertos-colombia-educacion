@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install playwright
+      - run: pip install playwright==1.65.1
       - run: docker compose up -d --build --wait
       - name: Tablero vacío
         run: python scripts/tablero.py --channel chrome

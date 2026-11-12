@@ -77,12 +77,14 @@ function QualityPanel({ q }: { q: Quality }) {
 }
 
 function ReconcileNote({ rec }: { rec: Reconcile }) {
-  if (rec.error) return <p className="note">Sin conciliar: la fuente no respondió a la consulta de totales ({rec.error}).</p>;
+  if (rec.error) return <p className="note">Sin conciliar: {rec.error}</p>;
   const differ = rec.rows.filter((r) => r.diff !== 0).length;
   return (
     <>
       <p className="note">
-        En {differ} de {rec.rows.length} años la suma que publica la fuente no coincide con la del pipeline: la diferencia es lo que quitó la limpieza.
+        {differ === 0
+          ? `En los ${rec.rows.length} años la suma que publica la fuente coincide con la del pipeline.`
+          : `En ${differ} de ${rec.rows.length} años la suma que publica la fuente no coincide con la del pipeline: la diferencia es lo que quitó la limpieza.`}{" "}
         Esa suma la calcula el servidor de datos.gov.co, no este código.
       </p>
       <details>
@@ -135,15 +137,25 @@ export default function App() {
     getSeries(category || undefined).then(setSeries).catch((e: Error) => setError(e.message));
   }, [ov, category]);
 
-  const execute = async () => {
+  // Sigue una ejecución hasta que termina: la que lanza este botón (start) o una que ya estaba en curso.
+  const follow = useCallback(async (start?: () => Promise<void>) => {
     setRunErr(null);
-    setRun({ running: true, stage: "extraer", rows: 0 });
+    setRun((r) => r ?? { running: true, stage: "extraer", rows: 0 });
     let alive = true; // una respuesta de progreso que llegue tarde no debe revivir el estado "en curso"
-    const timer = setInterval(() => { getRun().then((s) => { if (alive && s.running) setRun(s); }).catch(() => {}); }, 500);
-    try { await postRun(); setFresh(true); await load(); }
-    catch (e) { setRunErr((e as Error).message); }
-    finally { alive = false; clearInterval(timer); setRun(null); }
-  };
+    const timer = setInterval(() => {
+      getRun().then((s) => { if (alive && s.running && s.stage !== "listo") setRun(s); }).catch(() => {});
+    }, 500);
+    const idle = async () => { while ((await getRun()).running) await new Promise((r) => setTimeout(r, 700)); };
+    let ok = true;
+    try {
+      if (start) await start().catch(async (e: Error) => { ok = false; setRunErr(e.message); await idle(); }); // 409: otra pestaña la lanzó; se espera igual
+      else await idle();
+      if (ok) setFresh(true);
+    } catch (e) { setRunErr((e as Error).message); }
+    finally { alive = false; clearInterval(timer); await load(); setRun(null); }
+  }, [load]);
+  // Al abrir o recargar con una ejecución en marcha, el tablero la sigue en vez de mostrar lo anterior como actual.
+  useEffect(() => { getRun().then((s) => { if (s.running) void follow(); }).catch(() => {}); }, [follow]);
 
   const maxCat = useMemo(() => Math.max(...cats.map((c) => c.value), 1), [cats]);
 
@@ -179,7 +191,7 @@ export default function App() {
           )}
         </div>
         <div className="run">
-          <button className="primary" onClick={() => void execute()} disabled={!!run}>{run ? "Ejecutando…" : "Ejecutar pipeline"}</button>
+          <button className="primary" onClick={() => void follow(postRun)} disabled={!!run}>{run ? "Ejecutando…" : "Ejecutar pipeline"}</button>
           <small>Descarga los datos reales de datos.gov.co</small>
         </div>
       </header>
@@ -193,7 +205,7 @@ export default function App() {
       <Flow ov={ov} run={run} fresh={fresh} />
 
       {ov && m && (
-        <>
+        <div className={run ? "stale" : undefined} aria-busy={!!run} {...(run ? { inert: "" } : {})}>
           <Kpis m={m} series={full} yearly={!!yearly} />
 
           {demo && (
@@ -294,7 +306,7 @@ export default function App() {
             <h2 id="h-cal">Calidad de los datos</h2>
             <QualityPanel q={ov.quality} />
           </section>
-        </>
+        </div>
       )}
     </main>
   );

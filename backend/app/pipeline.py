@@ -1,4 +1,4 @@
-"""Pipeline: extraer -> validar -> cargar -> analizar -> resumir.
+"""Pipeline: extraer -> validar -> analizar -> resumir -> conciliar -> guardar.
 
 Uso (desde la carpeta backend, con el entorno activo):
     python -m app.pipeline run --config ../config/dataset.yaml
@@ -15,7 +15,7 @@ import yaml
 
 from .analyze import compute_metrics, period_settings
 from .config import ColumnsCfg, load_cfg, settings
-from .db import engine, put_artifact
+from .db import engine, init_db, put_artifact
 from .extract import fetch_all, save_raw
 from .reconcile import reconcile
 from .sample import SampleParams, make_sample
@@ -30,7 +30,7 @@ progress: dict = {"running": False, "stage": None, "rows": 0}
 
 def run(config_path: str, use_sample: bool = False, sample_params: SampleParams | None = None) -> dict:
     progress.update(stage="extraer", rows=0)
-    cfg = None
+    cfg = rows = None
     if use_sample:
         raw = make_sample(sample_params)
         cols = ColumnsCfg(date="fecha", category="departamento", value="valor")
@@ -39,7 +39,6 @@ def run(config_path: str, use_sample: bool = False, sample_params: SampleParams 
     else:
         cfg = load_cfg(config_path)
         rows = fetch_all(cfg, settings.socrata_app_token, on_page=lambda n: progress.update(rows=n))
-        save_raw(rows)
         raw = pd.DataFrame(rows)
         cols = cfg.columns
         granularity = cfg.dataset.granularity
@@ -49,15 +48,12 @@ def run(config_path: str, use_sample: bool = False, sample_params: SampleParams 
             "source": f"https://{cfg.dataset.domain}/resource/{cfg.dataset.id}",
         }
     log.info("Filas extraídas: %d", len(raw))
-    progress.update(stage="validar", rows=len(raw))
 
+    progress.update(stage="validar", rows=len(raw))
     clean, report = validate(raw, cols)
     log.info("Filas válidas: %d de %d", report.rows_out, report.rows_in)
-
-    progress.update(stage="guardar")
-    clean.to_sql("records", engine, if_exists="replace", index=False)
-    Path("data/processed").mkdir(parents=True, exist_ok=True)
-    clean.to_csv("data/processed/records.csv", index=False)  # útil para cargarlo en Power BI
+    if rows is not None:
+        save_raw(rows)  # después de validar: una descarga inservible no desplaza a las copias crudas buenas
 
     progress.update(stage="analizar")
     freq, complete = period_settings(granularity)
@@ -72,15 +68,27 @@ def run(config_path: str, use_sample: bool = False, sample_params: SampleParams 
     if cfg is not None:
         try:
             conc["rows"] = reconcile(clean, cfg, settings.socrata_app_token)
-        except (httpx.HTTPError, ValueError, KeyError) as exc:
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
             conc["error"] = str(exc) or type(exc).__name__
             log.warning("Sin conciliar: %s", conc["error"])
 
+    # Todo lo anterior solo calcula. Se guarda al final y junto: si algo falla antes, queda la ejecución anterior
+    # completa, y el tablero nunca mezcla filas nuevas con métricas viejas.
+    progress.update(stage="guardar")
     meta["granularity"] = granularity
     meta["run_at"] = datetime.now(timezone.utc).isoformat()
-    for key, payload in {"meta": meta, "metrics": metrics, "quality": report.to_dict(), "facts": {"items": facts}, "summary": summary,
-                         "reconcile": conc}.items():
-        put_artifact(key, payload)
+    artifacts = {"meta": meta, "metrics": metrics, "quality": report.to_dict(), "facts": {"items": facts},
+                 "summary": summary, "reconcile": conc}
+    init_db()
+    with engine.begin() as conn:
+        clean.to_sql("records", conn, if_exists="replace", index=False)
+        for key, payload in artifacts.items():
+            put_artifact(key, payload, conn)
+    try:  # el CSV es una copia para Power BI: si está abierto allí (Windows lo bloquea), la ejecución no falla
+        Path("data/processed").mkdir(parents=True, exist_ok=True)
+        clean.to_csv("data/processed/records.csv", index=False)
+    except OSError as exc:
+        log.warning("No se pudo escribir records.csv: %s", exc)
     progress.update(stage="listo")
     return {"meta": meta, "quality": report.to_dict()}
 

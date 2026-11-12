@@ -35,7 +35,7 @@ code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-siz
 .sub { margin: 0; }
 .note { margin: 10px 0 0; }
 .eyebrow { margin: 0; color: var(--accent); font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; }
-.banner { background: var(--warn-soft); color: var(--warn); border-left: 4px solid var(--warn); border-radius: 0 8px 8px 0; padding: 10px 14px; margin: 0 0 16px; font-weight: 600; }
+.banner { background: var(--warn-soft); color: var(--warn); border: 1px solid rgb(255 180 84 / .45); border-radius: 10px; padding: 10px 14px; margin: 0 0 16px; font-weight: 600; }
 .error { color: var(--bad); font-weight: 600; margin: 0 0 12px; }
 .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 select { font: inherit; padding: 4px 8px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
@@ -66,7 +66,7 @@ button:disabled { opacity: .6; cursor: wait; }
 .flow-scroll { overflow-x: auto; }
 .flow-stage { position: relative; aspect-ratio: 1100 / 350; min-width: 900px; font-size: max(11px, 1.12cqw); }
 .flow-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.flow-stage ol { list-style: none; margin: 0; padding: 0; }
+.flow-stage ol, .flow-stage ul { list-style: none; margin: 0; padding: 0; }
 .edge { color: var(--accent); transition: opacity .4s; }
 .e-drop { color: var(--warn); }
 .edge-track { fill: none; stroke: currentColor; stroke-linecap: round; transition: stroke-width .5s; }
@@ -76,7 +76,7 @@ button:disabled { opacity: .6; cursor: wait; }
 @keyframes flow { to { stroke-dashoffset: -17; } }
 .node { --c: var(--accent); position: absolute; transform: translate(-50%, -50%); width: 11.4%; display: grid; gap: .1em;
   padding: .65em .75em; border-radius: .9em; border: 1px solid var(--line); background: var(--surface); transition: border-color .3s, box-shadow .3s; }
-.n-validar { --c: var(--violet); } .n-guardar { --c: var(--ok); } .n-analizar, .n-resumir { --c: #74a8ff; } .n-conciliar { --c: var(--ok); }
+.n-validar { --c: var(--violet); } .n-analizar, .n-resumir, .n-conciliar { --c: #74a8ff; } .n-guardar { --c: var(--ok); }
 .n-drop { --c: var(--warn); }
 .node-label { font-size: .74em; color: var(--c); text-transform: uppercase; letter-spacing: .09em; font-weight: 600; }
 .node-count { font: 700 1.75em/1.1 var(--serif); }
@@ -94,6 +94,9 @@ button:disabled { opacity: .6; cursor: wait; }
 @keyframes arrive { from { opacity: .25; box-shadow: none; border-color: var(--line); } 60% { box-shadow: 0 0 2.6em 0 var(--c); } }
 .flow-caption { margin: 0; padding: .7rem 1.25rem; border-top: 1px solid var(--line); background: rgb(6 9 19 / .6); font-size: .92rem; color: var(--muted); min-height: 2.9rem; }
 
+/* Durante una ejecución, lo de abajo es de la anterior: atenuado y sin interacción */
+.stale { opacity: .4; transition: opacity .3s; }
+
 /* Indicadores */
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin: 16px 0 0; }
 .kpis > div { padding: 16px 18px; display: flex; flex-direction: column; gap: 2px; background: rgb(255 255 255 / .04); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
@@ -107,7 +110,7 @@ button:disabled { opacity: .6; cursor: wait; }
 
 /* Resumen */
 .summary { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.summary li { padding: 12px 14px 12px 16px; border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; background: linear-gradient(90deg, var(--accent-soft), transparent 55%); }
+.summary li { padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: linear-gradient(90deg, var(--accent-soft), transparent 55%); }
 .summary p { margin: 0 0 6px; font-size: 1.02rem; line-height: 1.55; }
 details summary { cursor: pointer; color: var(--accent); font-size: .875rem; }
 .evidence { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 10px 0 0; }

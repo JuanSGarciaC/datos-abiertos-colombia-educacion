@@ -24,13 +24,14 @@ muestra el recorrido de los datos, ejecuta el pipeline con un botón y concilia 
 
 ## Qué se ve en el tablero
 
-- **Mapa del pipeline.** Fuente → Extraer → Validar → Guardar → Analizar → Resumir → Conciliar, con una rama por
+- **Mapa del pipeline.** Fuente → Extraer → Validar → Analizar → Resumir → Conciliar → Guardar, con una rama por
   cada tipo de descarte. El grosor de cada arista es proporcional a las filas que pasan por ella y una rama sin
   descartes queda apagada. Con este dataset: entran 19 618 filas, 9 629 salen por copias, 6 por no tener
   departamento y quedan 9 983.
 - **Ejecución en vivo.** «Ejecutar pipeline» descarga los datos reales (`POST /api/run`). Mientras tanto el tablero
   consulta `GET /api/run`, gira el nodo de la etapa en curso y cuenta las filas descargadas. Solo corre una
-  ejecución a la vez; si la fuente falla, se conserva lo anterior y se muestra el error.
+  ejecución a la vez desde el tablero. Todo se calcula primero y se guarda al final: si algo falla por el camino,
+  queda la ejecución anterior completa y se muestra el error. Al recargar en mitad de una ejecución, el tablero la sigue.
 - **Conciliación con la fuente.** Detrás de cada barra anual, un contorno punteado con la suma que calcula el
   servidor de datos.gov.co sobre las filas tal como están publicadas. En 16 de los 17 años la fuente publica el
   doble: es la duplicación que quita la limpieza. La tabla año por año está en un desplegable y el detalle en
@@ -104,7 +105,9 @@ El control compara números; **no** verifica que la interpretación sea correcta
 | El modelo solo redacta a partir de hechos | Reduce el riesgo de cifras inventadas | El control es de números, no de interpretación |
 | Datos sintéticos solo con `--sample` y aviso visible | Permiten desarrollar sin red | Nunca como evidencia |
 | El progreso de la ejecución vive en memoria | Basta para un proceso local y no añade tablas | Con más de un *worker* habría que guardarlo en la base |
-| Una sola ejecución a la vez (409) | Dos a la vez se pisarían la tabla `records` | No hay cola: la segunda petición se rechaza |
+| Una sola ejecución a la vez (409) | Dos a la vez se pisarían la tabla `records` | No hay cola: la segunda petición se rechaza. El candado es del proceso de la API: no cubre una ejecución lanzada a la vez por línea de comandos |
+| Filas y artefactos se guardan juntos al final | Un fallo a mitad no deja el tablero mezclando dos ejecuciones | En SQLite el `DROP TABLE` de `records` no entra en la transacción; la ventana es de milisegundos y sin red de por medio |
+| La conciliación supone que se descargó todo el dataset | Así la diferencia es solo lo que quitó la limpieza | Con más filas que `max_rows` (50 000) la descarga se corta y la diferencia incluiría lo no descargado; este dataset tiene 19 618 |
 | Si falla la consulta de conciliación, el pipeline termina igual | Los datos ya están validados y guardados | El tablero dice «sin conciliar» hasta la siguiente ejecución |
 | Se conservan los tres últimos JSON crudos | El botón no debe llenar el disco | Las descargas anteriores se borran |
 | `INSERT OR REPLACE` en `db.py` | Simple en SQLite | Específico de SQLite; en PostgreSQL se usa `ON CONFLICT` |
@@ -174,7 +177,7 @@ Sirve para desarrollar y para las pruebas automáticas sin red. Genera datos **s
 | `GET /api/overview` | Metadatos, métricas, calidad, hechos, resumen y conciliación |
 | `GET /api/series?category=` | Serie por período, total o por categoría |
 | `GET /api/categories` | Valor total por categoría |
-| `POST /api/run` | Ejecuta el pipeline con el dataset configurado (409 si ya hay una ejecución; 502 si la fuente falla) |
+| `POST /api/run` | Ejecuta el pipeline con el dataset configurado (409 si ya hay una ejecución; 502 si la fuente no responde; 500 con el motivo si falla otra etapa) |
 | `GET /api/run` | Progreso: `running`, `stage` y filas extraídas |
 | `GET /api/sample/params`, `POST /api/sample` | Solo para la muestra sintética; nunca sobrescribe datos reales |
 
@@ -186,7 +189,7 @@ pytest -q
 ```
 
 Cubren la validación, el análisis, el control de cifras, el pipeline completo con la API, la ejecución desde la API
-(progreso, 409, 502 y conciliación caída) y la lectura del `dataset.yaml`. Ninguna toca la red.
+(progreso, 409, 502, conciliación caída, fallo tardío sin dejar la base a medias, CSV bloqueado) y la lectura del `dataset.yaml`. Ninguna toca la red.
 
 Extremo a extremo, contra el contenedor y en un navegador real:
 
@@ -199,7 +202,8 @@ uv run --with playwright --with pillow scripts/tablero.py --real --out docs/img 
 El script comprueba que cada cifra del mapa es la que devuelve la API, que una rama sin descartes queda apagada y que
 la tabla de conciliación tiene una fila por año. En GitHub Actions corre dos veces: con el tablero vacío y con la
 muestra sintética (determinista y sin red). Con `--real` ejecuta el pipeline desde el botón contra datos.gov.co; eso
-se corre a mano porque depende de la fuente.
+se corre a mano porque depende de la fuente, y es la única comprobación en navegador de las barras y la tabla de
+conciliación (la muestra sintética no tiene fuente con la que conciliar).
 
 ## Evidencias de ejecución
 

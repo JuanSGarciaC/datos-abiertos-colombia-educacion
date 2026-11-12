@@ -10,8 +10,8 @@ forma de ver una ejecución desde la interfaz.
 
 ## Alcance
 
-1. **Mapa del pipeline** (`frontend/src/Flow.tsx`): Fuente → Extraer → Validar → Guardar → Analizar →
-   Resumir → Conciliar, con cuatro ramas de descarte bajo Validar (copias, fechas inválidas, sin
+1. **Mapa del pipeline** (`frontend/src/Flow.tsx`): Fuente → Extraer → Validar → Analizar →
+   Resumir → Conciliar → Guardar (el orden real: se guarda todo junto al final), con cuatro ramas de descarte bajo Validar (copias, fechas inválidas, sin
    categoría, valores inválidos). Grosor de arista proporcional a las filas; una rama con 0 queda
    apagada. Datos: `quality`, `metrics`, `summary` y `reconcile` de `GET /api/overview`.
 2. **Ejecución en vivo con datos reales**: `POST /api/run` ejecuta el pipeline contra datos.gov.co

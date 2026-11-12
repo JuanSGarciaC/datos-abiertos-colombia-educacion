@@ -21,14 +21,17 @@ def init_db() -> None:
         )
 
 
-def put_artifact(key: str, payload: dict) -> None:
+def put_artifact(key: str, payload: dict, conn=None) -> None:
+    """Con `conn`, escribe dentro de la transacción de quien llama (el pipeline guarda todo junto)."""
+    # INSERT OR REPLACE es específico de SQLite; con PostgreSQL usa ON CONFLICT.
+    stmt = text("INSERT OR REPLACE INTO artifacts (key, payload, updated_at) VALUES (:k, :p, :u)")
+    params = {"k": key, "p": json.dumps(payload, ensure_ascii=False), "u": datetime.now(timezone.utc).isoformat()}
+    if conn is not None:
+        conn.execute(stmt, params)
+        return
     init_db()
-    with engine.begin() as conn:
-        # INSERT OR REPLACE es específico de SQLite; con PostgreSQL usa ON CONFLICT.
-        conn.execute(
-            text("INSERT OR REPLACE INTO artifacts (key, payload, updated_at) VALUES (:k, :p, :u)"),
-            {"k": key, "p": json.dumps(payload, ensure_ascii=False), "u": datetime.now(timezone.utc).isoformat()},
-        )
+    with engine.begin() as own:
+        own.execute(stmt, params)
 
 
 def get_artifact(key: str) -> dict | None:

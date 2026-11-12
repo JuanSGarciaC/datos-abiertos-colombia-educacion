@@ -83,7 +83,8 @@ with sync_playwright() as pw:
     page = browser.new_page(viewport={"width": 1180, "height": 620}, device_scale_factor=1)
     errors: list[str] = []
     page.on("pageerror", lambda e: errors.append(str(e)))
-    page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+    # Solo cuentan los errores de esta aplicación: una fuente tipográfica externa que no cargue no es un fallo del tablero.
+    page.on("console", lambda m: errors.append(m.text) if m.type == "error" and m.location.get("url", "").startswith(args.url) else None)
     page.goto(args.url)
     button = page.get_by_role("button", name="Ejecutar pipeline")
     expect(button).to_be_enabled()

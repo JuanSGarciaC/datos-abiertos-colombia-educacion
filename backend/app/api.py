@@ -85,10 +85,10 @@ def sample_defaults():
 @app.post("/api/sample")
 def regenerate_sample(params: SampleParams):
     """Regenera la muestra sintética. Nunca sobrescribe datos reales."""
-    meta = get_artifact("meta")
-    if meta is not None and meta.get("source") != "demo-sintetica":
-        raise HTTPException(status_code=409, detail="La base contiene datos reales; no se sobrescribe con una muestra.")
-    with _running():
+    with _running():  # la comprobación va dentro del candado: una ejecución real no puede colarse en medio
+        meta = get_artifact("meta")
+        if meta is not None and meta.get("source") != "demo-sintetica":
+            raise HTTPException(status_code=409, detail="La base contiene datos reales; no se sobrescribe con una muestra.")
         return pipeline.run("", use_sample=True, sample_params=params)["meta"]
 
 
@@ -104,8 +104,10 @@ def run_real():
     with _running():
         try:
             return pipeline.run(settings.dataset_config)
-        except (httpx.HTTPError, ValueError, OSError) as exc:
-            raise HTTPException(status_code=502, detail=f"La fuente no respondió como se esperaba: {exc or type(exc).__name__}") from exc
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=f"La fuente no respondió: {exc or type(exc).__name__}") from exc
+        except Exception as exc:  # configuración, esquema cambiado, base bloqueada: el tablero debe poder decir qué pasó
+            raise HTTPException(status_code=500, detail=f"El pipeline falló y se conserva la ejecución anterior: {exc or type(exc).__name__}") from exc
 
 
 # El tablero compilado, si existe (imagen Docker). Va al final para no tapar /api.

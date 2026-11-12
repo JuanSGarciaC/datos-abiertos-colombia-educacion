@@ -4,7 +4,8 @@ const nf = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
 const W = 1100, H = 350, Y = 100, YD = 285;
 
 // Nodos HTML colocados con las mismas coordenadas (en %) que las aristas del SVG.
-const MAIN = ["fuente", "extraer", "validar", "guardar", "analizar", "resumir", "conciliar"] as const;
+// Mismo orden que pipeline.run: se calcula todo y se guarda al final, de una vez.
+const MAIN = ["fuente", "extraer", "validar", "analizar", "resumir", "conciliar", "guardar"] as const;
 const X = MAIN.map((_, i) => 85 + i * 155);
 const DISCARDS = ["copias", "fechas", "categoria", "valores"] as const;
 const XD = DISCARDS.map((_, i) => 163 + i * 155);
@@ -21,17 +22,17 @@ export default function Flow({ ov, run, fresh }: Props) {
   // Etapa en curso: los nodos anteriores quedan encendidos y el actual gira.
   const stage = run ? Math.max(1, MAIN.indexOf(run.stage as (typeof MAIN)[number])) : -1;
   const rowsIn = run ? run.rows : q?.rows_in ?? 0;
-  const show = (i: number) => (run ? i <= 1 : !!ov); // en curso solo se conoce lo extraído; lo demás sería de la ejecución anterior
+  const show = (i: number) => (run ? i === 1 : !!ov); // en curso solo se conoce lo extraído; lo demás sería de la ejecución anterior
 
   const rec = ov?.reconcile;
   const main: { label: string; count: number | null; sub: string }[] = [
-    { label: "Fuente", count: rowsIn, sub: !ov && !run ? "datos.gov.co" : demo && !run ? "muestra sintética" : "filas publicadas" },
+    { label: "Fuente", count: rowsIn, sub: run || !ov ? "datos.gov.co" : demo ? "muestra sintética" : "filas publicadas" },
     { label: "Extraer", count: rowsIn, sub: run && stage === 1 ? "descargando por páginas" : "API SODA, por páginas" },
     { label: "Validar", count: q?.rows_dropped ?? 0, sub: "filas descartadas" },
-    { label: "Guardar", count: q?.rows_out ?? 0, sub: "filas en SQLite" },
     { label: "Analizar", count: ov?.metrics.months_complete ?? 0, sub: ov ? `${yearly ? "años" : "meses"} · ${ov.metrics.n_categories ?? 0} categorías` : "períodos y categorías" },
-    { label: "Resumir", count: ov?.summary.sentences.length ?? 0, sub: ov ? `frases · ${ov.summary.fallback_count} corregidas` : "frases con control de cifras" },
+    { label: "Resumir", count: ov?.summary.sentences.length ?? 0, sub: ov ? `frases · ${ov.summary.fallback_count} corregidas` : "frases del resumen" },
     { label: "Conciliar", count: rec?.rows.length ?? 0, sub: rec?.error ? "sin conciliar" : demo ? "no aplica a la muestra" : "años contra la fuente" },
+    { label: "Guardar", count: q?.rows_out ?? 0, sub: "filas en SQLite" },
   ];
   const discards = [
     { label: "Copias", count: q?.duplicates_removed ?? 0 },
@@ -40,14 +41,14 @@ export default function Flow({ ov, run, fresh }: Props) {
     { label: "Valores inválidos", count: q?.invalid_values ?? 0 },
   ];
 
-  // Grosor proporcional a las filas que pasan por la arista; las dos últimas llevan hechos, no filas.
+  // Grosor proporcional a las filas que pasan por la arista; entre Analizar y Conciliar viajan hechos, no filas.
   const total = q?.rows_in || 1;
   const width = (rows: number) => 2 + 12 * Math.min(1, rows / total);
-  const mainRows = [rowsIn, rowsIn, q?.rows_out ?? 0, q?.rows_out ?? 0, 0, 0];
+  const mainRows = [rowsIn, rowsIn, q?.rows_out ?? 0, 0, 0, q?.rows_out ?? 0];
   const settled = !run && !!ov;
 
   const caption = run
-    ? stage === 1 ? `Descargando de datos.gov.co: ${nf.format(run.rows)} filas hasta ahora…` : `Etapa en curso: ${run.stage}…`
+    ? `${stage === 1 ? `Descargando de datos.gov.co: ${nf.format(run.rows)} filas hasta ahora…` : `Etapa en curso: ${run.stage}…`}${ov ? " Abajo siguen los datos de la ejecución anterior." : ""}`
     : ov
       ? `Última ejecución: ${new Date(ov.meta.run_at).toLocaleString("es-CO")} · de ${nf.format(q!.rows_in)} filas recibidas quedaron ${nf.format(q!.rows_out)}.`
       : "Aún no hay datos. Ejecuta el pipeline para descargarlos de datos.gov.co.";
@@ -62,7 +63,7 @@ export default function Flow({ ov, run, fresh }: Props) {
               const d = `M${x + HALF},${Y} L${X[i + 1] - HALF},${Y}`;
               return (
                 <g key={i} className="edge" opacity={on ? 1 : 0.18}>
-                  <path className="edge-track" d={d} strokeWidth={i < 4 ? width(mainRows[i]) : 2} opacity={0.3} />
+                  <path className="edge-track" d={d} strokeWidth={mainRows[i] ? width(mainRows[i]) : 2} opacity={0.3} />
                   {on && <path className="edge-flow" d={d} />}
                 </g>
               );
@@ -78,7 +79,7 @@ export default function Flow({ ov, run, fresh }: Props) {
               );
             })}
           </svg>
-          <ol>
+          <ol role="list" aria-label="Etapas del pipeline">
             {main.map((nd, i) => {
               const state = run ? (i === stage ? " busy" : i < stage ? " lit" : "") : settled ? " lit" : "";
               return (
@@ -89,14 +90,16 @@ export default function Flow({ ov, run, fresh }: Props) {
                 </li>
               );
             })}
+          </ol>
+          <ul role="list" aria-label="Descartes de la validación">
             {discards.map((nd, i) => (
-              <li key={nd.label} className={`node n-drop${settled && nd.count > 0 ? " lit" : ""}`} style={{ ...at(XD[i], YD), "--i": 3 } as React.CSSProperties}>
+              <li key={nd.label} className={`node n-drop${settled && nd.count > 0 ? " lit" : ""}`} style={{ ...at(XD[i], YD), "--i": 2.5 } as React.CSSProperties}>
                 <span className="node-label">Descarte</span>
                 <span className="node-count">{settled ? nf.format(nd.count) : "—"}</span>
                 <span className="node-sub">{nd.label}</span>
               </li>
             ))}
-          </ol>
+          </ul>
         </div>
       </div>
       <figcaption className="flow-caption" aria-live="polite">{caption}</figcaption>
