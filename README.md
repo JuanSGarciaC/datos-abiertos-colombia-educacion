@@ -191,3 +191,7 @@ Juan S. García C. · [GitHub: JuanSGarciaC](https://github.com/JuanSGarciaC)
 ## Desarrollo
 
 Construido con asistencia de herramientas de IA; el código está cubierto por pruebas automáticas y cada decisión de diseño está documentada arriba.
+
+## Licencia
+
+Todos los derechos reservados. El código se publica para consulta como parte de mi portafolio: puedes leerlo, pero no usarlo, copiarlo, modificarlo ni distribuirlo sin mi autorización por escrito. Ver [LICENSE](LICENSE).
