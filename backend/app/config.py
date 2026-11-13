@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     llm_model: str = "claude-haiku-5-5"  # verifica el nombre vigente en la documentación del proveedor
     socrata_app_token: str = ""
     cors_origins: str = "http://localhost:5173"
+    dataset_config: str = "../config/dataset.yaml"  # dataset que ejecuta POST /api/run
 
 
 settings = Settings()

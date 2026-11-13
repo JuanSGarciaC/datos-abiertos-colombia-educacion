@@ -43,14 +43,19 @@ def compare(pipeline: dict[str, float], source: dict[str, tuple[float, int]]) ->
     return rows
 
 
+def reconcile(clean: pd.DataFrame, cfg: PipelineCfg, token: str = "", client: httpx.Client | None = None) -> list[dict]:
+    """Total por año de los datos limpios frente a la suma publicada."""
+    pipeline = clean.groupby(clean["date"].dt.year.astype(str))["value"].sum().round(2).to_dict()
+    return compare(pipeline, source_totals(cfg, token, client))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Concilia los totales del pipeline con la fuente")
     parser.add_argument("--config", default="../config/dataset.yaml")
     cfg = load_cfg(parser.parse_args().config)
     records = pd.read_sql("select date, value from records", engine, parse_dates=["date"])
-    pipeline = records.groupby(records["date"].dt.year.astype(str))["value"].sum().round(2).to_dict()
     print("| Año | Pipeline | Suma publicada | Filas publicadas | Fuente / pipeline |\n|---|---|---|---|---|")
-    for r in compare(pipeline, source_totals(cfg, settings.socrata_app_token)):
+    for r in reconcile(records, cfg, settings.socrata_app_token):
         print(f"| {r['period']} | {r['pipeline']:,.1f} | {r['source']:,.1f} | {r['source_rows']} | {r['ratio']} |")
 
 

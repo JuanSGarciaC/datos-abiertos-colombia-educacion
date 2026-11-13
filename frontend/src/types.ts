@@ -14,7 +14,10 @@ export interface Quality {
 export interface Fact { id: string; text: string; evidence: Record<string, string> }
 export interface Sentence { fact_id: string; text: string; evidence: Record<string, string>; fallback: boolean }
 export interface Summary { provider: string; model: string | null; fallback_count: number; error: string | null; sentences: Sentence[] }
-export interface Overview { meta: Meta; metrics: Metrics; quality: Quality; facts: Fact[]; summary: Summary }
+export interface ReconcileRow { period: string; pipeline: number; source: number; source_rows: number; diff: number; ratio: number | null }
+export interface Reconcile { rows: ReconcileRow[]; error: string | null }
+export interface Overview { meta: Meta; metrics: Metrics; quality: Quality; facts: Fact[]; summary: Summary; reconcile: Reconcile | null }
+export interface RunStatus { running: boolean; stage: string | null; rows: number }
 export interface SeriesPoint { month: string; value: number; partial: boolean }
 export interface SampleCategory { name: string; weight: number }
 export interface SampleParams {
