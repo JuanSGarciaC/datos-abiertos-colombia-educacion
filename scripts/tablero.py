@@ -33,6 +33,11 @@ def overview() -> dict | None:
         raise
 
 
+def categories() -> list[dict]:
+    with urllib.request.urlopen(f"{args.url}/api/categories") as r:
+        return json.load(r)
+
+
 def digits(text: str) -> str:
     return re.sub(r"\D", "", text)
 
@@ -53,11 +58,21 @@ def check_board(page, ov: dict) -> None:
         # Una rama sin descartes queda apagada; con descartes, encendida.
         assert ("lit" in node.get_attribute("class").split()) == (value > 0), label
     assert sum(drops.values()) == q["rows_dropped"], "los descartes del mapa no suman lo descartado"
+    # Mapa por departamento: la tabla de respaldo trae las mismas cifras que la API (indicador «Total del periodo»).
+    mapa = page.locator("section.map3d")
+    mapa.scroll_into_view_if_needed()
+    expect(mapa.locator(".map-wrap.ready, .map-wrap.failed")).to_have_count(1, timeout=15000)  # nunca se queda cargando
+    rows = mapa.locator(".map-table tbody tr")  # dentro de un <details> cerrado: se lee con text_content
+    cats = categories()
+    expect(rows).to_have_count(len(cats))
+    for c, row in zip(cats, rows.all()):
+        assert row.locator("th").text_content() == c["category"] and digits(row.locator("td").text_content()) == str(round(c["value"])), c
     expect(page.get_by_role("heading", name="Resumen")).to_be_visible()
     expect(page.get_by_role("heading", name="Calidad de los datos")).to_be_visible()
     if ov["reconcile"]["rows"]:
         page.get_by_text("Ver la conciliación año por año").click()
-        expect(page.locator("tbody tr")).to_have_count(len(ov["reconcile"]["rows"]))
+        conc = page.locator("details", has=page.get_by_text("Ver la conciliación año por año"))
+        expect(conc.locator("tbody tr")).to_have_count(len(ov["reconcile"]["rows"]))
         assert page.locator("rect.ghost").count() == len(ov["reconcile"]["rows"])
 
 
