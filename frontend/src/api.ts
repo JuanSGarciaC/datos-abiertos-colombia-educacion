@@ -1,4 +1,4 @@
-import type { Category, Overview, RunStatus, SampleParams, SeriesPoint } from "./types";
+import type { Category, CategoryYear, Overview, RunStatus, SampleParams, SeriesPoint } from "./types";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -28,6 +28,7 @@ export async function postRun(): Promise<void> {
   throw new Error(msg);
 }
 export const getCategories = () => get<Category[]>("/api/categories");
+export const getCategoryYears = () => get<CategoryYear[]>("/api/categories/years");
 export const getSeries = (category?: string) =>
   get<SeriesPoint[]>(`/api/series${category ? `?category=${encodeURIComponent(category)}` : ""}`);
 

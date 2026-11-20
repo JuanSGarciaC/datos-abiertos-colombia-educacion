@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getCategories, getOverview, getRun, getSeries, postRun } from "./api";
+import { getCategories, getCategoryYears, getOverview, getRun, getSeries, postRun } from "./api";
 import Flow from "./Flow";
+import Map3D from "./Map3D";
+import { useReveal } from "./motion";
 import SamplePanel from "./SamplePanel";
 import { AnnualBars, Heatmap, Kpis, YearOverYear } from "./Visuals";
-import type { Category, Overview, Quality, Reconcile, RunStatus, SeriesPoint } from "./types";
+import type { Category, CategoryYear, Overview, Quality, Reconcile, RunStatus, SeriesPoint } from "./types";
 
 const nf = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
 const n = (x: number) => nf.format(x);
@@ -111,6 +113,7 @@ export default function App() {
   const [ov, setOv] = useState<Overview | null>(null);
   const [ready, setReady] = useState(false);
   const [cats, setCats] = useState<Category[]>([]);
+  const [byYear, setByYear] = useState<CategoryYear[]>([]);
   const [category, setCategory] = useState("");
   const [series, setSeries] = useState<SeriesPoint[]>([]);
   const [full, setFull] = useState<SeriesPoint[]>([]);
@@ -124,8 +127,8 @@ export default function App() {
     try {
       const o = await getOverview();
       if (o) {
-        const [c, f] = await Promise.all([getCategories(), getSeries()]);
-        setCats(c); setFull(f); setCategory("");
+        const [c, f, cy] = await Promise.all([getCategories(), getSeries(), getCategoryYears()]);
+        setCats(c); setFull(f); setByYear(cy); setCategory("");
       }
       setOv(o); setReady(true);
     } catch (e) { setError((e as Error).message); }
@@ -157,6 +160,7 @@ export default function App() {
   // Al abrir o recargar con una ejecución en marcha, el tablero la sigue en vez de mostrar lo anterior como actual.
   useEffect(() => { getRun().then((s) => { if (s.running) void follow(); }).catch(() => {}); }, [follow]);
 
+  const barsRef = useReveal<HTMLUListElement>();
   const maxCat = useMemo(() => Math.max(...cats.map((c) => c.value), 1), [cats]);
 
   if (error) {
@@ -207,6 +211,8 @@ export default function App() {
       {ov && m && (
         <div className={run ? "stale" : undefined} aria-busy={!!run} {...(run ? { inert: "" } : {})}>
           <Kpis m={m} series={full} yearly={!!yearly} />
+
+          {byYear.length > 0 && <Map3D rows={byYear} selected={category} onSelect={setCategory} yearly={!!yearly} />}
 
           {demo && (
             <section className="card" aria-labelledby="h-muestra">
@@ -259,12 +265,12 @@ export default function App() {
 
             <section className="card" aria-labelledby="h-cat">
               <h2 id="h-cat">Valor por categoría</h2>
-              <ul className="bars">
-                {cats.slice(0, 10).map((c) => (
+              <ul className="bars" ref={barsRef} data-reveal="">
+                {cats.slice(0, 10).map((c, i) => (
                   <li key={c.category}>
                     <button className={c.category === category ? "on" : ""} onClick={() => setCategory(c.category === category ? "" : c.category)}>
                       <span className="name">{c.category}</span>
-                      <span className="bar"><i style={{ width: `${(c.value / maxCat) * 100}%` }} /></span>
+                      <span className="bar"><i style={{ width: `${(c.value / maxCat) * 100}%`, "--i": i } as React.CSSProperties} /></span>
                       <span className="val">{n(c.value)}</span>
                     </button>
                   </li>

@@ -24,3 +24,4 @@ export interface SampleParams {
   seed: number; start: string; end: string; categories: SampleCategory[]; base_level: number;
   growth_pct_per_month: number; anomaly_month: string | null; anomaly_factor: number; add_dirty_rows: boolean;
 }
+export interface CategoryYear { category: string; year: string; value: number }

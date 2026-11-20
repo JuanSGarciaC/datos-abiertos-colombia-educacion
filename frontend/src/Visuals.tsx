@@ -1,9 +1,15 @@
 import { useState } from "react";
+import { useCountUp, useReveal } from "./motion";
 import type { Metrics, SeriesPoint } from "./types";
 
 const nf = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
 const n = (x: number) => nf.format(x);
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+/** Cifra con count-up (A7): el valor final está en el primer render. */
+function CountUp({ value }: { value: number }) {
+  return <>{n(Math.round(useCountUp(value)))}</>;
+}
 
 function Spark({ points }: { points: SeriesPoint[] }) {
   const pts = points.filter((p) => !p.partial).slice(-18);
@@ -18,11 +24,11 @@ export function Kpis({ m, series, yearly }: { m: Metrics; series: SeriesPoint[];
   const ch = m.change_pct;
   return (
     <div className="kpis">
-      <div><span className="k">Total</span><b>{n(m.total_value ?? 0)}</b><Spark points={series} /></div>
+      <div><span className="k">Total</span><b><CountUp value={m.total_value ?? 0} /></b><Spark points={series} /></div>
       {m.last_month && (
         <div>
           <span className="k">{yearly ? "Último año" : "Último mes completo"} · {m.last_month}</span>
-          <b>{n(m.last_value ?? 0)}</b>
+          <b><CountUp value={m.last_value ?? 0} /></b>
           <span className={`delta ${ch == null ? "" : ch > 0 ? "up" : "down"}`}>
             {ch == null ? "sin comparación" : `${ch > 0 ? "▲ +" : ch < 0 ? "▼ " : ""}${ch.toLocaleString("es-CO")} % vs ${m.prev_month}`}
           </span>
@@ -43,8 +49,9 @@ export function Heatmap({ series }: { series: SeriesPoint[] }) {
   const by = new Map(series.map((p) => [p.month, p]));
   const years = [...new Set(series.map((p) => p.month.slice(0, 4)))];
   const max = Math.max(...series.map((p) => p.value), 1);
+  const reveal = useReveal<HTMLDivElement>();
   return (
-    <div>
+    <div ref={reveal} data-reveal="">
       <div className="heat" role="table" aria-label="Valor por mes y año">
         <span />
         {MESES.map((m) => <span key={m} className="hh">{m}</span>)}
@@ -56,7 +63,7 @@ export function Heatmap({ series }: { series: SeriesPoint[] }) {
               if (!p) return <span key={i} className="hc empty" />;
               const pct = 12 + 78 * (p.value / max);
               return (
-                <button key={i} className={`hc${p.partial ? " partial" : ""}`} style={{ background: `color-mix(in srgb, var(--accent) ${pct}%, var(--surface))` }}
+                <button key={i} className={`hc${p.partial ? " partial" : ""}`} style={{ "--i": i, background: `color-mix(in srgb, var(--accent) ${pct}%, var(--surface))` } as React.CSSProperties}
                   aria-label={`${p.month}: ${n(p.value)}${p.partial ? " (incompleto)" : ""}`}
                   onPointerEnter={() => setSel(p)} onFocus={() => setSel(p)} onClick={() => setSel(p)} />
               );
@@ -108,8 +115,9 @@ export function AnnualBars({ series, anomalies, source = {} }: { series: SeriesP
   const slot = (W - L - R) / Math.max(series.length, 1);
   const hasSource = Object.keys(source).length > 0;
   const step = Math.max(1, Math.round(series.length / 8));
+  const reveal = useReveal<HTMLDivElement>();
   return (
-    <div>
+    <div ref={reveal} data-reveal="">
       <svg viewBox={`0 0 ${W} ${H}`} className="yoy" role="img" aria-label="Valor por año">
         {[0, 0.5, 1].map((t) => (
           <g key={t}><line className="grid" x1={L} x2={W - R} y1={T + (1 - t) * (H - T - B)} y2={T + (1 - t) * (H - T - B)} />
@@ -121,7 +129,7 @@ export function AnnualBars({ series, anomalies, source = {} }: { series: SeriesP
           return (
             <g key={p.month}>
               {hs > 0 && <rect className="ghost" x={L + i * slot + slot * 0.12} y={H - B - hs} width={slot * 0.76} height={hs} rx={2} />}
-              <rect x={L + i * slot + slot * 0.12} y={H - B - h} width={slot * 0.76} height={Math.max(h, 0)} rx={2}
+              <rect className="grow" style={{ "--i": i } as React.CSSProperties} x={L + i * slot + slot * 0.12} y={H - B - h} width={slot * 0.76} height={Math.max(h, 0)} rx={2}
                 fill={anomalies.includes(p.month) ? "var(--warn)" : "var(--accent)"} opacity={sel?.month === p.month ? 1 : 0.8}
                 tabIndex={0} role="img" aria-label={`${p.month}: ${n(p.value)}${source[p.month] ? `; publicado ${n(source[p.month])}` : ""}`}
                 onPointerEnter={() => setSel(p)} onFocus={() => setSel(p)} onClick={() => setSel(p)} />
