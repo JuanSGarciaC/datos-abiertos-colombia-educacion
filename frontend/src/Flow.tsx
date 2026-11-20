@@ -62,8 +62,8 @@ export default function Flow({ ov, run, fresh }: Props) {
               const on = run ? i < stage : settled;
               const d = `M${x + HALF},${Y} L${X[i + 1] - HALF},${Y}`;
               return (
-                <g key={i} className="edge" opacity={on ? 1 : 0.18}>
-                  <path className="edge-track" d={d} strokeWidth={mainRows[i] ? width(mainRows[i]) : 2} opacity={0.3} />
+                <g key={i} className="edge" opacity={on ? 1 : 0.18} style={{ "--i": i } as React.CSSProperties}>
+                  <path className="edge-track" d={d} pathLength={1} strokeWidth={mainRows[i] ? width(mainRows[i]) : 2} opacity={0.3} />
                   {on && <path className="edge-flow" d={d} />}
                 </g>
               );
@@ -72,8 +72,8 @@ export default function Flow({ ov, run, fresh }: Props) {
               const on = settled && discards[i].count > 0;
               const d = `M${X[2]},${Y + 52} C${X[2]},${YD - 70} ${x},${Y + 90} ${x},${YD - 36}`;
               return (
-                <g key={i} className="edge e-drop" opacity={on ? 1 : 0.18}>
-                  <path className="edge-track" d={d} strokeWidth={on ? width(discards[i].count) : 2} opacity={0.3} />
+                <g key={i} className="edge e-drop" opacity={on ? 1 : 0.18} style={{ "--i": 2 } as React.CSSProperties}>
+                  <path className="edge-track" d={d} pathLength={1} strokeWidth={on ? width(discards[i].count) : 2} opacity={0.3} />
                   {on && <path className="edge-flow" d={d} />}
                 </g>
               );
