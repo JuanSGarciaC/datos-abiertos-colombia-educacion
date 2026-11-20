@@ -76,6 +76,14 @@ def categories():
     return [{"category": c, "value": round(float(v), 2)} for c, v in grouped.items()]
 
 
+@app.get("/api/categories/years")
+def categories_by_year():
+    """Valor por categoría y año: lo usa el mapa por departamento (altura por año y cambio frente al anterior)."""
+    df = _records()
+    grouped = df.groupby(["category", df["date"].dt.year])["value"].sum()
+    return [{"category": c, "year": str(y), "value": round(float(v), 2)} for (c, y), v in grouped.items()]
+
+
 @app.get("/api/sample/params")
 def sample_defaults():
     """Valores por defecto de la muestra, para rellenar el formulario del tablero."""

@@ -117,3 +117,14 @@ def test_csv_bloqueado_no_tumba_la_ejecucion(tmp_path, monkeypatch):
     monkeypatch.setattr(pd.DataFrame, "to_csv", lambda *a, **k: (_ for _ in ()).throw(PermissionError("abierto en Excel")))
     assert client.post("/api/run").status_code == 200
     assert client.get("/api/overview").json()["meta"]["source"].startswith("https://www.datos.gov.co")
+
+
+def test_categories_years_da_el_valor_por_departamento_y_año(tmp_path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    assert client.post("/api/run").status_code == 200
+    rows = client.get("/api/categories/years").json()
+    # 2 departamentos x 17 años; cada fila de ROWS suma 5+3+(100+y-2005)+2+1+0.
+    assert len(rows) == 2 * 17
+    antioquia_2010 = next(r for r in rows if r["category"] == "Antioquia" and r["year"] == "2010")
+    assert antioquia_2010["value"] == 5 + 3 + 105 + 2 + 1
+    assert sum(r["value"] for r in rows) == sum(c["value"] for c in client.get("/api/categories").json())
