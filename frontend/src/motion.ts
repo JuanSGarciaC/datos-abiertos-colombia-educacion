@@ -35,7 +35,7 @@ interface CountOpts {
 
 /** Cuenta de 0 al valor en el texto del elemento. Devuelve una función que la detiene. */
 export function countUp(el: { textContent: string | null }, target: number, format: (x: number) => string, opts: CountOpts = {}): () => void {
-  const { duration = 700, raf = requestAnimationFrame, caf = cancelAnimationFrame, onDone } = opts;
+  const { duration = 1200, raf = requestAnimationFrame, caf = cancelAnimationFrame, onDone } = opts;
   let start: number | null = null;
   let id = 0;
   const tick = (now: number) => {
