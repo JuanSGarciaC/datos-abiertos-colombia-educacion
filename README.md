@@ -22,6 +22,14 @@ muestra el recorrido de los datos, ejecuta el pipeline con un botón y concilia 
 
 </details>
 
+### Efectos de la interfaz
+
+Grabados a ritmo real con la **muestra sintética** (por eso aparece el aviso naranja): enseñan las animaciones, no son evidencia de datos.
+
+| Primera carga: cifras que cuentan y tarjetas que aparecen al bajar | Al regenerar los datos: las aristas se dibujan etapa a etapa |
+|---|---|
+| ![Entrada del tablero](docs/img/30-entrada-efectos.webp) | ![Aristas del mapa al regenerar](docs/img/31-aristas-a6.webp) |
+
 ## Qué se ve en el tablero
 
 - **Mapa del pipeline.** Fuente → Extraer → Validar → Analizar → Resumir → Conciliar → Guardar, con una rama por
@@ -36,6 +44,11 @@ muestra el recorrido de los datos, ejecuta el pipeline con un botón y concilia 
   servidor de datos.gov.co sobre las filas tal como están publicadas. En 16 de los 17 años la fuente publica el
   doble: es la duplicación que quita la limpieza. La tabla año por año está en un desplegable y el detalle en
   [docs/RECONCILIACION.md](docs/RECONCILIACION.md).
+- **Efectos.** En la primera carga de cada sesión del navegador, los KPI cuentan hasta su valor (terminan en la cifra
+  exacta; el lector de pantalla solo lee la final), las tarjetas aparecen en escalera al bajar y la línea y las barras
+  se dibujan. Al refrescar no se repite. Con cada ejecución nueva, las aristas del mapa se dibujan en orden. Con
+  `prefers-reduced-motion` no hay animaciones y, sin JavaScript, todo el contenido sigue visible. Sin librerías:
+  CSS, `IntersectionObserver` y `requestAnimationFrame` (`frontend/src/motion.ts`).
 
 ## Qué demuestra este proyecto
 
@@ -49,7 +62,7 @@ muestra el recorrido de los datos, ejecuta el pipeline con un botón y concilia 
 | API REST | `backend/app/api.py` (FastAPI) |
 | Visualización | tablero React en `frontend/`; mapa del pipeline en SVG propio, sin librerías de gráficos |
 | Contenedores y pruebas de extremo a extremo | `Dockerfile`, `docker-compose.yml`, `scripts/tablero.py` (Playwright) |
-| Pruebas automáticas e integración continua | `backend/tests/`, `.github/workflows/ci.yml` |
+| Pruebas automáticas e integración continua | `backend/tests/` (pytest), `frontend/src/*.test.ts*` (vitest), `.github/workflows/ci.yml` |
 | Entrega a BI | `backend/data/processed/records.csv`, listo para Power BI |
 
 ## Datos
@@ -194,6 +207,17 @@ pytest -q
 Cubren la validación, el análisis, el control de cifras, el pipeline completo con la API, la ejecución desde la API
 (progreso, 409, 502, conciliación caída, fallo tardío sin dejar la base a medias, CSV bloqueado) y la lectura del `dataset.yaml`. Ninguna toca la red.
 
+Frontend (vitest):
+
+```powershell
+cd frontend
+npm test
+```
+
+Cubren la lógica de los efectos: la curva de la cuenta, que termine exactamente en la cifra real, que la entrada se
+vea una sola vez por sesión y nunca con movimiento reducido, que se pueda detener, la aparición al bajar y que el
+HTML sin JavaScript ya traiga la cifra real. El CI corre `npm test` antes del build del frontend.
+
 Extremo a extremo, contra el contenedor y en un navegador real:
 
 ```powershell
@@ -213,12 +237,17 @@ conciliación (la muestra sintética no tiene fuente con la que conciliar).
 <details>
 <summary>Ver capturas</summary>
 
-**Pruebas pasando** (salida del 2026-11-12; el CI las corre en cada push, ver la insignia de arriba)
+**Pruebas pasando** (salida del 2026-11-21; el CI las corre en cada push, ver la insignia de arriba)
 
 ```text
 > pytest -q
 .......................................                                  [100%]
 39 passed, 1 warning
+
+> npm test
+ ✓ src/motion.test.ts (8 tests)
+ ✓ src/Visuals.test.tsx (1 test)
+      Tests  9 passed (9)
 ```
 
 **Fuente: la API publica el mismo registro dos veces (Bogotá, 2016)**
@@ -249,9 +278,9 @@ conciliación (la muestra sintética no tiene fuente con la que conciliar).
 backend/app/        extract, validate, analyze, summarize, reconcile, db, pipeline, api, sample
 backend/tests/      pruebas automáticas
 config/             dataset.yaml y sample.yaml
-frontend/src/       tablero React (App, Flow, Visuals, SamplePanel)
+frontend/src/       tablero React (App, Flow, Visuals, SamplePanel) y efectos (motion.ts), con sus pruebas *.test.ts*
 scripts/            tablero.py: comprobaciones en navegador, capturas y GIF
-docs/img/           capturas y GIF
+docs/img/           capturas, GIF y animaciones WebP
 docs/superpowers/   especificación de la última fase
 Dockerfile, docker-compose.yml   un contenedor: la API sirve el tablero compilado
 .github/workflows/  ci.yml

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCategories, getOverview, getRun, getSeries, postRun } from "./api";
 import Flow from "./Flow";
+import { revealOnScroll } from "./motion";
 import SamplePanel from "./SamplePanel";
 import { AnnualBars, Heatmap, Kpis, YearOverYear } from "./Visuals";
 import type { Category, Overview, Quality, Reconcile, RunStatus, SeriesPoint } from "./types";
@@ -33,7 +34,7 @@ function SeriesChart({ points, anomalies }: { points: SeriesPoint[]; anomalies: 
             <text className="tick" x={L - 6} y={y(max * t) + 4} textAnchor="end">{n(max * t)}</text>
           </g>
         ))}
-        <path className="line" d={path(complete)} />
+        <path className="line" d={path(complete)} pathLength={1} />
         {points.length > complete.length && complete.length > 0 && (
           <path className="line partial" d={`M${x(complete.length - 1)},${y(complete[complete.length - 1].value)}L${x(points.length - 1)},${y(points[points.length - 1].value)}`} />
         )}
@@ -137,8 +138,21 @@ export default function App() {
     getSeries(category || undefined).then(setSeries).catch((e: Error) => setError(e.message));
   }, [ov, category]);
 
+  // Entrada (A1+A2): tarjetas y KPI aparecen en escalera al entrar en pantalla. Solo con la marca que pone main.tsx.
+  const endReveal = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!ov || endReveal.current || !document.documentElement.dataset.intro) return;
+    endReveal.current = revealOnScroll(document.querySelectorAll<HTMLElement>(".page .card, .kpis > div"));
+  }, [ov]);
+  // Cuando el usuario cambia los datos, la entrada termina: se destapa lo pendiente y las cifras ya no cuentan.
+  const endIntro = useCallback(() => {
+    delete document.documentElement.dataset.intro;
+    endReveal.current?.();
+  }, []);
+
   // Sigue una ejecución hasta que termina: la que lanza este botón (start) o una que ya estaba en curso.
   const follow = useCallback(async (start?: () => Promise<void>) => {
+    endIntro();
     setRunErr(null);
     setRun((r) => r ?? { running: true, stage: "extraer", rows: 0 });
     let alive = true; // una respuesta de progreso que llegue tarde no debe revivir el estado "en curso"
@@ -153,7 +167,7 @@ export default function App() {
       if (ok) setFresh(true);
     } catch (e) { setRunErr((e as Error).message); }
     finally { alive = false; clearInterval(timer); await load(); setRun(null); }
-  }, [load]);
+  }, [load, endIntro]);
   // Al abrir o recargar con una ejecución en marcha, el tablero la sigue en vez de mostrar lo anterior como actual.
   useEffect(() => { getRun().then((s) => { if (s.running) void follow(); }).catch(() => {}); }, [follow]);
 
@@ -212,7 +226,7 @@ export default function App() {
             <section className="card" aria-labelledby="h-muestra">
               <h2 id="h-muestra">Muestra sintética</h2>
               <p className="note">Cambia los parámetros y regenera: todo el tablero, el resumen y las pruebas de validación se recalculan.</p>
-              <SamplePanel onDone={() => { setFresh(true); void load(); }} />
+              <SamplePanel onDone={() => { endIntro(); setFresh(true); void load(); }} />
             </section>
           )}
 

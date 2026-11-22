@@ -1,9 +1,25 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { countUp } from "./motion";
 import type { Metrics, SeriesPoint } from "./types";
 
 const nf = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
 const n = (x: number) => nf.format(x);
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+/** Cifra que cuenta hasta su valor en la entrada (A7). El lector de pantalla solo lee la cifra final. */
+export function CountUp({ value }: { value: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const latest = useRef(value);
+  latest.current = value;
+  const played = useRef(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || played.current || !document.documentElement.dataset.intro) return;
+    const stop = countUp(el, value, n, { onDone: () => (played.current = true) });
+    return () => { stop(); el.textContent = n(latest.current); }; // si el valor cambia a mitad, queda el nuevo
+  }, [value]);
+  return <><span className="sr-only">{n(value)}</span><span aria-hidden="true" ref={ref}>{n(value)}</span></>;
+}
 
 function Spark({ points }: { points: SeriesPoint[] }) {
   const pts = points.filter((p) => !p.partial).slice(-18);
@@ -18,11 +34,11 @@ export function Kpis({ m, series, yearly }: { m: Metrics; series: SeriesPoint[];
   const ch = m.change_pct;
   return (
     <div className="kpis">
-      <div><span className="k">Total</span><b>{n(m.total_value ?? 0)}</b><Spark points={series} /></div>
+      <div><span className="k">Total</span><b><CountUp value={m.total_value ?? 0} /></b><Spark points={series} /></div>
       {m.last_month && (
         <div>
           <span className="k">{yearly ? "Último año" : "Último mes completo"} · {m.last_month}</span>
-          <b>{n(m.last_value ?? 0)}</b>
+          <b><CountUp value={m.last_value ?? 0} /></b>
           <span className={`delta ${ch == null ? "" : ch > 0 ? "up" : "down"}`}>
             {ch == null ? "sin comparación" : `${ch > 0 ? "▲ +" : ch < 0 ? "▼ " : ""}${ch.toLocaleString("es-CO")} % vs ${m.prev_month}`}
           </span>
